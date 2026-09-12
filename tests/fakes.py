@@ -35,6 +35,23 @@ class FakeMessage:
         return record["text"]
 
 
+class FakeBot:
+    """Duck-typed stand-in for aiogram's Bot — avoids needing a real token or
+    network access in tests. `send_message` can be scripted to raise, to
+    exercise the notification worker's retry/backoff/blocked-sender paths."""
+
+    def __init__(self, side_effects: list | None = None):
+        self.sent: list[dict] = []
+        self._side_effects = list(side_effects or [])
+
+    async def send_message(self, chat_id: int, text: str):
+        if self._side_effects:
+            effect = self._side_effects.pop(0)
+            if isinstance(effect, Exception):
+                raise effect
+        self.sent.append({"chat_id": chat_id, "text": text})
+
+
 class FakeCallbackQuery:
     def __init__(self, user_id: int, data: str, message: FakeMessage):
         self.from_user = FakeUser(user_id)
