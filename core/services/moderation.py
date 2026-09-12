@@ -13,6 +13,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.models import Block, Message, ModerationAction, PublicLink, Report, ReportStatus
 
 
+MASS_ABUSE_REPORT_THRESHOLD = 3
+
+
 async def report_message(
     session: AsyncSession, message: Message, reason: str, *, auto_disable_threshold: int
 ) -> Report:
@@ -40,6 +43,31 @@ async def report_message(
 
     await session.commit()
     await session.refresh(report)
+
+    # Mass-abuse handling: a sender reported across multiple recipients/links is
+    # a stronger signal than any single report, even if no one link crosses its
+    # own auto-disable threshold. There is no cross-recipient block (blocks are
+    # deliberately per-recipient), so the response is human escalation, not an
+    # automatic platform-wide ban.
+    total_reports = await sender_report_count(session, message.sender_fingerprint_hash)
+    if total_reports >= MASS_ABUSE_REPORT_THRESHOLD:
+        already_escalated = await session.execute(
+            select(ModerationAction).where(
+                ModerationAction.target == f"fingerprint:{message.sender_fingerprint_hash}"
+            )
+        )
+        if already_escalated.scalars().first() is None:
+            session.add(
+                ModerationAction(
+                    target=f"fingerprint:{message.sender_fingerprint_hash}",
+                    action="escalate",
+                    severity="L3",
+                    moderator="system",
+                    reason=f"mass-abuse signal: {total_reports} reports across messages from this sender",
+                )
+            )
+            await session.commit()
+
     return report
 
 

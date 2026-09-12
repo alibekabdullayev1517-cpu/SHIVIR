@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block content %}
+<h1 style="font-size:20px;margin-bottom:4px;">{{ title }}</h1>
+<div style="color:var(--color-muted);font-size:14px;line-height:1.6;">
+  {% for paragraph in paragraphs %}
+  <p>{{ paragraph }}</p>
+  {% endfor %}
+</div>
+{% endblock %}

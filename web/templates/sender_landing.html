@@ -19,6 +19,11 @@
   </div>
 
   <button type="button" class="primary" id="sendButton" disabled>{{ copy.send_cta }}</button>
+  <p style="text-align:center;margin-top:16px;">
+    <a href="/privacy?lang={{ lang }}" style="color:var(--color-muted);font-size:12px;text-decoration:underline;">
+      {{ "Maxfiylik siyosati" if lang == "uz" else "Политика конфиденциальности" }}
+    </a>
+  </p>
 </div>
 
 <div id="sendingView" class="state-overlay" hidden>

@@ -13,6 +13,7 @@ from bot.keyboards import (
     back_to_settings_keyboard,
     confirm_keyboard,
     link_ready_keyboard,
+    privacy_keyboard,
     settings_keyboard,
 )
 
@@ -41,10 +42,11 @@ async def on_settings_open(callback: CallbackQuery, session: AsyncSession) -> No
 
 
 @router.callback_query(F.data == "settings:privacy")
-async def on_privacy(callback: CallbackQuery, session: AsyncSession) -> None:
+async def on_privacy(callback: CallbackQuery, session: AsyncSession, settings: Settings) -> None:
     user = await get_or_create_user(session, callback.from_user.id)
     await callback.message.edit_text(
-        t("privacy_summary", user.lang), reply_markup=back_to_settings_keyboard(user.lang)
+        t("privacy_summary", user.lang),
+        reply_markup=privacy_keyboard(user.lang, settings.web_base_url),
     )
     await callback.answer()
 

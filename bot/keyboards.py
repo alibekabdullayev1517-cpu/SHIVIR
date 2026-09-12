@@ -105,6 +105,17 @@ def back_to_settings_keyboard(lang: str) -> InlineKeyboardMarkup:
     return b.as_markup()
 
 
+def privacy_keyboard(lang: str, web_base_url: str) -> InlineKeyboardMarkup:
+    b = InlineKeyboardBuilder()
+    b.button(
+        text=("To'liq matn" if lang == "uz" else "Полный текст"),
+        url=f"{web_base_url.rstrip('/')}/privacy?lang={lang}",
+    )
+    b.button(text=("⬅️ Sozlamalar" if lang == "uz" else "⬅️ Настройки"), callback_data="settings:open")
+    b.adjust(1)
+    return b.as_markup()
+
+
 def moderation_item_keyboard(action_id: int) -> InlineKeyboardMarkup:
     b = InlineKeyboardBuilder()
     b.button(text="Dismiss", callback_data=f"mod:dismiss:{action_id}")

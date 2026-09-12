@@ -12,7 +12,7 @@ from redis.asyncio import Redis
 from core.config import get_settings
 from core.copy import t
 
-from web.routes import health, sender
+from web.routes import health, legal, sender
 
 logger = logging.getLogger("shivir.web")
 _error_templates = Jinja2Templates(directory="web/templates")
@@ -31,6 +31,7 @@ def create_app() -> FastAPI:
     app = FastAPI(title="Shivir", lifespan=lifespan)
     app.mount("/static", StaticFiles(directory="web/static"), name="static")
     app.include_router(health.router)
+    app.include_router(legal.router)
     app.include_router(sender.router)
 
     @app.exception_handler(Exception)
