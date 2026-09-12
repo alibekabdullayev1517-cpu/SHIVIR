@@ -1,0 +1,17 @@
+[Unit]
+Description=Shivir Telegram bot (aiogram, long polling)
+After=network.target postgresql.service redis-server.service
+
+[Service]
+Type=simple
+User=shivir
+WorkingDirectory=/opt/shivir
+EnvironmentFile=/opt/shivir/.env
+ExecStart=/opt/shivir/.venv/bin/python -m bot.main
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

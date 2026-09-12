@@ -1,0 +1,57 @@
+# Example Nginx reverse-proxy config for the Shivir sender web app.
+# Copy to /etc/nginx/sites-available/shivir, adjust the domain, then:
+#   ln -s /etc/nginx/sites-available/shivir /etc/nginx/sites-enabled/shivir
+#   nginx -t && systemctl reload nginx
+#
+# HTTPS: obtain a certificate first (e.g. `certbot --nginx -d shivir.example.com`)
+# — certbot will rewrite this file's server blocks for you. The manual TLS
+# block below is provided for reference if you are not using certbot.
+
+server {
+    listen 80;
+    server_name shivir.example.com;
+
+    # Certbot uses this for the ACME HTTP-01 challenge; keep it even after
+    # HTTPS is set up, so certificate renewal keeps working.
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    server_name shivir.example.com;
+
+    ssl_certificate     /etc/letsencrypt/live/shivir.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/shivir.example.com/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    # Sender IPs matter for rate limiting/abuse fingerprinting — make sure this
+    # header actually reaches the app (core/services/sender.py trusts it).
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_set_header Host $host;
+
+    location /static/ {
+        alias /opt/shivir/web/static/;
+        expires 7d;
+        access_log off;
+    }
+
+    location /health {
+        proxy_pass http://127.0.0.1:8000;
+        access_log off;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_read_timeout 10s;
+    }
+
+    # Keep request bodies small — the sender form never needs more than a few KB.
+    client_max_body_size 64k;
+}
