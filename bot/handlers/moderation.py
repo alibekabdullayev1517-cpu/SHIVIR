@@ -37,7 +37,11 @@ async def cmd_modqueue(message: Message, session: AsyncSession, settings: Settin
         )
         if item.reason:
             text += f"\n\nEvidence:\n{item.reason[:500]}"
-        await message.answer(text, reply_markup=moderation_item_keyboard(item.id))
+        # parse_mode=None is deliberate: `reason` can hold a raw sender-supplied
+        # message body (evidence snapshot). The bot's default parse mode is
+        # HTML — without this override that untrusted text would be parsed as
+        # markup in front of the moderator, e.g. crafted clickable links.
+        await message.answer(text, reply_markup=moderation_item_keyboard(item.id), parse_mode=None)
 
 
 @router.callback_query(F.data.startswith("mod:"))
@@ -60,5 +64,7 @@ async def on_moderation_decision(callback: CallbackQuery, session: AsyncSession,
         await callback.answer("Not found.", show_alert=True)
         return
 
-    await callback.message.edit_text(f"{callback.message.text}\n\n✅ {decision} by {callback.from_user.id}")
+    await callback.message.edit_text(
+        f"{callback.message.text}\n\n✅ {decision} by {callback.from_user.id}", parse_mode=None
+    )
     await callback.answer()

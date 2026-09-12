@@ -68,10 +68,13 @@ async def on_message_open(callback: CallbackQuery, session: AsyncSession) -> Non
     await track("message_opened", user_id=tg_user_id, message_id=message.id)
 
     when = message.created_at.strftime("%Y-%m-%d %H:%M")
+    # parse_mode=None is deliberate: message.body is untrusted sender input.
+    # Rendering it through Markdown/HTML would let a sender inject clickable
+    # links (phishing) or malformed markup that breaks the message view.
     await callback.message.edit_text(
-        f"{message.body}\n\n_{when}_",
+        f"{message.body}\n\n{when}",
         reply_markup=message_detail_keyboard(user.lang, message.id),
-        parse_mode="Markdown",
+        parse_mode=None,
     )
     await callback.answer()
 
