@@ -63,3 +63,7 @@ async def regenerate_link(
 async def auto_disable_link(session: AsyncSession, link: PublicLink) -> None:
     link.active = False
     await session.commit()
+
+
+def build_sender_url(web_base_url: str, token: str) -> str:
+    return f"{web_base_url.rstrip('/')}/s/{token}"

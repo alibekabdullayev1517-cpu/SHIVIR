@@ -75,6 +75,46 @@ async def sender_report_count(session: AsyncSession, fingerprint_hash: str) -> i
     return result.scalar_one()
 
 
+async def _resolve_link_for_target(session: AsyncSession, target: str) -> PublicLink | None:
+    kind, _, raw_id = target.partition(":")
+    if not raw_id.isdigit():
+        return None
+    if kind == "link":
+        return await session.get(PublicLink, int(raw_id))
+    if kind == "message":
+        message = await session.get(Message, int(raw_id))
+        if message is not None:
+            return await session.get(PublicLink, message.link_id)
+    return None
+
+
+async def apply_moderator_decision(
+    session: AsyncSession, moderator_id: int, action_id: int, decision: str
+) -> ModerationAction | None:
+    """Every moderator action is a new append-only audit-log row, per spec, never
+    a mutation of the original auto-flag entry."""
+    original = await session.get(ModerationAction, action_id)
+    if original is None:
+        return None
+
+    entry = ModerationAction(
+        target=original.target,
+        action=decision,
+        severity=original.severity,
+        moderator=str(moderator_id),
+    )
+    session.add(entry)
+
+    if decision == "disable_link":
+        link = await _resolve_link_for_target(session, original.target)
+        if link is not None:
+            link.active = False
+
+    await session.commit()
+    await session.refresh(entry)
+    return entry
+
+
 async def moderation_queue(session: AsyncSession, limit: int = 50) -> list[ModerationAction]:
     """Severity-then-recency queue for human moderators (bot-command based in V1;
     no separate admin dashboard yet — that's V2+)."""

@@ -1,0 +1,185 @@
+"""Inbox, message detail, delete/report/block, and share-as-card."""
+
+from datetime import datetime, timezone
+
+from aiogram import F, Router
+from aiogram.types import BufferedInputFile, CallbackQuery
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from cards.render import render_variant_a
+from core.analytics import track
+from core.config import Settings
+from core.copy import t
+from core.services.links import build_sender_url, get_active_link_for_owner
+from core.services.messages import (
+    count_unread,
+    get_inbox_messages,
+    get_message_for_recipient,
+    mark_opened,
+)
+from core.services.moderation import block_sender, delete_message, report_message
+from core.services.links import get_or_create_user
+
+from bot.keyboards import (
+    confirm_keyboard,
+    inbox_keyboard,
+    message_detail_keyboard,
+    report_reason_keyboard,
+)
+
+router = Router(name="inbox")
+
+
+async def _render_inbox(callback: CallbackQuery, session: AsyncSession) -> None:
+    tg_user_id = callback.from_user.id
+    user = await get_or_create_user(session, tg_user_id)
+    messages = await get_inbox_messages(session, tg_user_id)
+    unread = await count_unread(session, tg_user_id)
+
+    await track("inbox_opened", user_id=tg_user_id, unread_count=unread)
+
+    if not messages:
+        await callback.message.edit_text(
+            t("inbox_empty", user.lang), reply_markup=inbox_keyboard(user.lang, [])
+        )
+    else:
+        title = "📥 Qutingiz" if user.lang == "uz" else "📥 Входящие"
+        await callback.message.edit_text(title, reply_markup=inbox_keyboard(user.lang, messages))
+
+
+@router.callback_query(F.data == "inbox:open")
+async def on_inbox_open(callback: CallbackQuery, session: AsyncSession) -> None:
+    await _render_inbox(callback, session)
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("msg:open:"))
+async def on_message_open(callback: CallbackQuery, session: AsyncSession) -> None:
+    message_id = int(callback.data.split(":")[2])
+    tg_user_id = callback.from_user.id
+    user = await get_or_create_user(session, tg_user_id)
+
+    message = await get_message_for_recipient(session, message_id, tg_user_id)
+    if message is None:
+        await callback.answer(t("generic_error", user.lang), show_alert=True)
+        return
+
+    await mark_opened(session, message)
+    await track("message_opened", user_id=tg_user_id, message_id=message.id)
+
+    when = message.created_at.strftime("%Y-%m-%d %H:%M")
+    await callback.message.edit_text(
+        f"{message.body}\n\n_{when}_",
+        reply_markup=message_detail_keyboard(user.lang, message.id),
+        parse_mode="Markdown",
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("msg:delete:"))
+async def on_delete_prompt(callback: CallbackQuery, session: AsyncSession) -> None:
+    message_id = int(callback.data.split(":")[2])
+    user = await get_or_create_user(session, callback.from_user.id)
+    await callback.message.edit_text(
+        t("delete_confirm_prompt", user.lang),
+        reply_markup=confirm_keyboard(user.lang, f"msg:deleteconfirm:{message_id}", f"msg:open:{message_id}"),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("msg:deleteconfirm:"))
+async def on_delete_confirm(callback: CallbackQuery, session: AsyncSession) -> None:
+    message_id = int(callback.data.split(":")[2])
+    tg_user_id = callback.from_user.id
+    message = await get_message_for_recipient(session, message_id, tg_user_id)
+    if message is not None:
+        await delete_message(session, message)
+        await track("message_deleted", user_id=tg_user_id, message_id=message_id)
+    await _render_inbox(callback, session)
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("msg:block:"))
+async def on_block_prompt(callback: CallbackQuery, session: AsyncSession) -> None:
+    message_id = int(callback.data.split(":")[2])
+    user = await get_or_create_user(session, callback.from_user.id)
+    prompt = (
+        "Bu yuboruvchini bloklaysizmi? U sizga boshqa xabar yubora olmaydi."
+        if user.lang == "uz"
+        else "Заблокировать этого отправителя? Он больше не сможет вам писать."
+    )
+    await callback.message.edit_text(
+        prompt,
+        reply_markup=confirm_keyboard(user.lang, f"msg:blockconfirm:{message_id}", f"msg:open:{message_id}"),
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("msg:blockconfirm:"))
+async def on_block_confirm(callback: CallbackQuery, session: AsyncSession) -> None:
+    message_id = int(callback.data.split(":")[2])
+    tg_user_id = callback.from_user.id
+    user = await get_or_create_user(session, tg_user_id)
+    message = await get_message_for_recipient(session, message_id, tg_user_id)
+    if message is not None:
+        await block_sender(session, tg_user_id, message.sender_fingerprint_hash)
+        await track("sender_blocked", user_id=tg_user_id, message_id=message_id)
+        await callback.answer(t("block_confirmation", user.lang), show_alert=True)
+    await _render_inbox(callback, session)
+
+
+@router.callback_query(F.data.startswith("msg:report:"))
+async def on_report_prompt(callback: CallbackQuery, session: AsyncSession) -> None:
+    message_id = int(callback.data.split(":")[2])
+    user = await get_or_create_user(session, callback.from_user.id)
+    prompt = "Nima uchun shikoyat qilyapsiz?" if user.lang == "uz" else "Причина жалобы?"
+    await callback.message.edit_text(prompt, reply_markup=report_reason_keyboard(message_id, user.lang))
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("msg:reportreason:"))
+async def on_report_reason(callback: CallbackQuery, session: AsyncSession, settings: Settings) -> None:
+    _, _, message_id_str, reason = callback.data.split(":")
+    message_id = int(message_id_str)
+    tg_user_id = callback.from_user.id
+    user = await get_or_create_user(session, tg_user_id)
+
+    message = await get_message_for_recipient(session, message_id, tg_user_id)
+    if message is None:
+        await callback.answer(t("generic_error", user.lang), show_alert=True)
+        return
+
+    await report_message(
+        session, message, reason, auto_disable_threshold=settings.link_auto_disable_report_threshold
+    )
+    await track("report_created", user_id=tg_user_id, message_id=message_id, reason=reason)
+
+    await callback.answer(t("report_confirmation", user.lang), show_alert=True)
+    await _render_inbox(callback, session)
+
+
+@router.callback_query(F.data.startswith("msg:card:"))
+async def on_share_card(callback: CallbackQuery, session: AsyncSession, settings: Settings) -> None:
+    message_id = int(callback.data.split(":")[2])
+    tg_user_id = callback.from_user.id
+    user = await get_or_create_user(session, tg_user_id)
+
+    message = await get_message_for_recipient(session, message_id, tg_user_id)
+    if message is None:
+        await callback.answer(t("generic_error", user.lang), show_alert=True)
+        return
+
+    link = await get_active_link_for_owner(session, tg_user_id)
+    cta_link = build_sender_url(settings.web_base_url, link.token) if link else settings.web_base_url
+
+    png_bytes = render_variant_a(message.body, cta_link)
+    caption = (
+        "Kartani Instagram yoki Telegram'da ulashing!"
+        if user.lang == "uz"
+        else "Поделитесь карточкой в Instagram или Telegram!"
+    )
+    await callback.message.answer_photo(
+        BufferedInputFile(png_bytes, filename="shivir-card.png"), caption=caption
+    )
+    await track("share_card_generated", user_id=tg_user_id, message_id=message_id)
+    await callback.answer()

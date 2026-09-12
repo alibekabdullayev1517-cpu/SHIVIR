@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from enum import Enum
 
 from redis.asyncio import Redis
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import Settings
@@ -138,3 +138,43 @@ async def send_message(
         await _enqueue_notification(redis, message.id)
 
     return SendResult(status=SendStatus.STORED, message_id=message.id)
+
+
+async def get_inbox_messages(session: AsyncSession, recipient_user_id: int, limit: int = 20) -> list[Message]:
+    result = await session.execute(
+        select(Message)
+        .where(Message.recipient_user_id == recipient_user_id, Message.deleted_at.is_(None))
+        .order_by(Message.created_at.desc())
+        .limit(limit)
+    )
+    return list(result.scalars().all())
+
+
+async def count_unread(session: AsyncSession, recipient_user_id: int) -> int:
+    result = await session.execute(
+        select(func.count(Message.id)).where(
+            Message.recipient_user_id == recipient_user_id,
+            Message.deleted_at.is_(None),
+            Message.opened_at.is_(None),
+        )
+    )
+    return result.scalar_one()
+
+
+async def get_message_for_recipient(
+    session: AsyncSession, message_id: int, recipient_user_id: int
+) -> Message | None:
+    result = await session.execute(
+        select(Message).where(
+            Message.id == message_id,
+            Message.recipient_user_id == recipient_user_id,
+            Message.deleted_at.is_(None),
+        )
+    )
+    return result.scalars().first()
+
+
+async def mark_opened(session: AsyncSession, message: Message) -> None:
+    if message.opened_at is None:
+        message.opened_at = datetime.now(timezone.utc)
+        await session.commit()
