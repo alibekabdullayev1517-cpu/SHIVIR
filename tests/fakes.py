@@ -3,9 +3,10 @@ functions, without spinning up a real Bot/Dispatcher/network connection."""
 
 
 class FakeUser:
-    def __init__(self, user_id: int, language_code: str = "en"):
+    def __init__(self, user_id: int, language_code: str = "en", first_name: str = "Test"):
         self.id = user_id
         self.language_code = language_code
+        self.first_name = first_name
 
 
 class FakeMessage:

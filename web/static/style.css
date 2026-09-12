@@ -1,0 +1,247 @@
+/* Design tokens per docs/SHIVIR-master-plan.md's FINAL DESIGN TOKENS.
+   Font is the system stack, not Inter/Manrope — that recommendation is
+   explicitly marked "to validate," and the sender page's #1 priority is
+   fastest possible load on slow mobile networks, which a webfont request
+   works against. */
+
+:root {
+  --color-primary: #5b4fe8;
+  --color-accent: #2dd4bf;
+  --color-text: #151521;
+  --color-muted: #8a8a99;
+  --color-surface: #f7f7fb;
+  --color-card: #ffffff;
+  --color-error: #ef4444;
+  --color-success: #22c55e;
+  --radius-card: 16px;
+  --radius-button: 12px;
+  --radius-input: 10px;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-text: #f5f5fa;
+    --color-muted: #9a9aab;
+    --color-surface: #0e0e14;
+    --color-card: #1b1b26;
+    color-scheme: dark;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.45;
+  -webkit-text-size-adjust: 100%;
+}
+
+.page {
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 24px 16px 40px;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.wordmark {
+  font-weight: 700;
+  font-size: 20px;
+  color: var(--color-primary);
+  margin-bottom: 24px;
+}
+
+.reassurance {
+  font-size: 15px;
+  color: var(--color-muted);
+  margin-bottom: 20px;
+}
+
+.reassurance strong {
+  color: var(--color-text);
+}
+
+textarea#composer {
+  width: 100%;
+  min-height: 140px;
+  border-radius: var(--radius-input);
+  border: 1px solid rgba(138, 138, 153, 0.35);
+  background: var(--color-card);
+  color: var(--color-text);
+  padding: 14px 16px;
+  font-size: 16px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+textarea#composer:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+.prompts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+
+.prompt-chip {
+  background: var(--color-card);
+  border: 1px solid rgba(138, 138, 153, 0.35);
+  color: var(--color-text);
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 13px;
+  min-height: 32px;
+  cursor: pointer;
+}
+
+.counter-row {
+  display: flex;
+  justify-content: flex-end;
+  font-size: 13px;
+  color: var(--color-muted);
+  margin-top: 6px;
+}
+
+.counter-row.over-limit {
+  color: var(--color-error);
+}
+
+button.primary {
+  min-height: 48px;
+  border-radius: var(--radius-button);
+  background: var(--color-primary);
+  color: #ffffff;
+  border: none;
+  font-size: 16px;
+  font-weight: 600;
+  width: 100%;
+  margin-top: 16px;
+  transition: opacity 150ms ease-out;
+}
+
+button.primary:disabled {
+  opacity: 0.4;
+}
+
+button.secondary {
+  min-height: 44px;
+  border-radius: var(--radius-button);
+  background: transparent;
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary);
+  font-size: 15px;
+  font-weight: 600;
+  width: 100%;
+  margin-top: 10px;
+}
+
+.state-overlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 12px;
+  flex: 1;
+  padding: 32px 8px;
+  animation: fade-in 200ms ease-out;
+}
+
+.state-overlay[hidden] {
+  display: none;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.icon-badge {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+}
+
+.icon-badge.success {
+  background: rgba(34, 197, 94, 0.12);
+  color: var(--color-success);
+}
+
+.icon-badge.warning {
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+}
+
+.icon-badge.error {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--color-error);
+}
+
+.state-title {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.state-body {
+  color: var(--color-muted);
+  font-size: 14px;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 3px solid rgba(91, 79, 232, 0.2);
+  border-top-color: var(--color-primary);
+  animation: spin 700ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.button-row {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  margin-top: 8px;
+}
+
+.button-row button {
+  flex: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

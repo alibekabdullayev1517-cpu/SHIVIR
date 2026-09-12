@@ -16,7 +16,13 @@ from core.analytics import track
 from core.config import Settings
 from core.copy import t
 from core.models import User
-from core.services.links import build_sender_url, create_link, get_active_link_for_owner, get_or_create_user
+from core.services.links import (
+    build_sender_url,
+    create_link,
+    get_active_link_for_owner,
+    get_or_create_user,
+    set_display_name,
+)
 
 from bot.keyboards import home_keyboard, language_keyboard, link_ready_keyboard, welcome_keyboard
 
@@ -38,12 +44,14 @@ async def cmd_start(message: Message, session: AsyncSession, settings: Settings)
     )
 
     if is_returning:
+        await set_display_name(session, existing, message.from_user.first_name)
         await _send_home(message, existing.lang)
         return
 
     detected = (message.from_user.language_code or "uz").lower()
     default_lang = "ru" if detected.startswith("ru") else "uz"
-    await get_or_create_user(session, tg_user_id, lang=default_lang)
+    user = await get_or_create_user(session, tg_user_id, lang=default_lang)
+    await set_display_name(session, user, message.from_user.first_name)
     await message.answer(
         "Tilni tanlang / Выберите язык", reply_markup=language_keyboard()
     )

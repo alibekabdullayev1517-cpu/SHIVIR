@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block content %}
+<div id="composeView">
+  <p class="reassurance">
+    {% if display_name %}
+      <strong>{{ display_name }}</strong> — {{ copy.reassurance }}
+    {% else %}
+      {{ copy.reassurance }}
+    {% endif %}
+  </p>
+
+  <textarea id="composer" maxlength="{{ max_length }}" placeholder="{{ copy.placeholder }}" autofocus></textarea>
+  <div class="counter-row" id="counterRow">0 / {{ max_length }}</div>
+
+  <div class="prompts">
+    {% for prompt in prompts %}
+    <button type="button" class="prompt-chip" data-prompt="{{ prompt }}">{{ prompt }}</button>
+    {% endfor %}
+  </div>
+
+  <button type="button" class="primary" id="sendButton" disabled>{{ copy.send_cta }}</button>
+</div>
+
+<div id="sendingView" class="state-overlay" hidden>
+  <div class="spinner"></div>
+</div>
+
+<div id="successView" class="state-overlay" hidden>
+  <div class="icon-badge success">✓</div>
+  <div class="state-title">{{ copy.success }}</div>
+  <button type="button" class="secondary" onclick="window.location.href='https://t.me/{{ bot_username }}'">
+    {{ copy.success_secondary_cta }}
+  </button>
+</div>
+
+<div id="rateLimitedView" class="state-overlay" hidden>
+  <div class="icon-badge warning">⏳</div>
+  <div class="state-title">{{ copy.rate_limited }}</div>
+</div>
+
+<div id="warningView" class="state-overlay" hidden>
+  <div class="icon-badge warning">!</div>
+  <div class="state-title">{{ copy.abuse_prompt }}</div>
+  <div class="button-row">
+    <button type="button" class="secondary" id="warningEditBtn">{{ copy.abuse_edit }}</button>
+    <button type="button" class="primary" id="warningContinueBtn">{{ copy.abuse_continue }}</button>
+  </div>
+</div>
+
+<div id="errorView" class="state-overlay" hidden>
+  <div class="icon-badge error">!</div>
+  <div class="state-title">{{ copy.generic_error }}</div>
+  <button type="button" class="secondary" id="errorRetryBtn">{{ copy.send_cta }}</button>
+</div>
+
+<script>
+(function () {
+  const token = {{ token | tojson }};
+  const csrfToken = {{ csrf_token | tojson }};
+  const maxLength = {{ max_length }};
+
+  const composer = document.getElementById("composer");
+  const counterRow = document.getElementById("counterRow");
+  const sendButton = document.getElementById("sendButton");
+
+  const views = {
+    compose: document.getElementById("composeView"),
+    sending: document.getElementById("sendingView"),
+    success: document.getElementById("successView"),
+    rateLimited: document.getElementById("rateLimitedView"),
+    warning: document.getElementById("warningView"),
+    error: document.getElementById("errorView"),
+  };
+
+  function showView(name) {
+    for (const key in views) {
+      views[key].hidden = key !== name;
+    }
+  }
+
+  let startedTracked = false;
+  function trackMessageStarted() {
+    if (startedTracked) return;
+    startedTracked = true;
+    fetch(`/s/${token}/track`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "message_started" }),
+      keepalive: true,
+    }).catch(() => {});
+  }
+
+  function updateCounter() {
+    const len = composer.value.length;
+    counterRow.textContent = `${len} / ${maxLength}`;
+    counterRow.classList.toggle("over-limit", len > maxLength);
+    sendButton.disabled = len === 0 || len > maxLength;
+  }
+
+  composer.addEventListener("input", () => {
+    trackMessageStarted();
+    updateCounter();
+  });
+
+  document.querySelectorAll(".prompt-chip").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      composer.value = chip.dataset.prompt + " ";
+      composer.focus();
+      trackMessageStarted();
+      updateCounter();
+    });
+  });
+
+  async function submit(acknowledgeWarning) {
+    showView("sending");
+    try {
+      const response = await fetch(`/s/${token}/send`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: composer.value,
+          csrf_token: csrfToken,
+          acknowledge_warning: acknowledgeWarning,
+        }),
+      });
+      const data = await response.json();
+
+      if (data.status === "success") {
+        showView("success");
+      } else if (data.status === "rate_limited") {
+        showView("rateLimited");
+      } else if (data.status === "needs_warning") {
+        showView("warning");
+      } else {
+        showView("error");
+      }
+    } catch (err) {
+      showView("error");
+    }
+  }
+
+  sendButton.addEventListener("click", () => submit(false));
+
+  document.getElementById("warningEditBtn").addEventListener("click", () => {
+    showView("compose");
+    composer.focus();
+  });
+  document.getElementById("warningContinueBtn").addEventListener("click", () => submit(true));
+  document.getElementById("errorRetryBtn").addEventListener("click", () => showView("compose"));
+
+  updateCounter();
+})();
+</script>
+{% endblock %}

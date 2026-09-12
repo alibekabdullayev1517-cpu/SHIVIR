@@ -15,6 +15,20 @@ async def get_or_create_user(session: AsyncSession, tg_user_id: int, lang: str =
     return user
 
 
+async def set_display_name(session: AsyncSession, user: User, display_name: str | None) -> None:
+    """Stores the recipient's own Telegram first name, for their own sender
+    page's personalization ("Bu odamga anonim xabar yuboring" needs *someone*
+    to refer to). This is the account owner's own public first name, supplied
+    by them via Telegram — not sender identity, and not stored for anyone else."""
+    if not display_name:
+        return
+    settings = dict(user.settings or {})
+    if settings.get("display_name") != display_name:
+        settings["display_name"] = display_name
+        user.settings = settings
+        await session.commit()
+
+
 async def get_active_link_for_owner(session: AsyncSession, owner_user_id: int) -> PublicLink | None:
     result = await session.execute(
         select(PublicLink).where(
