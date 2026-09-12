@@ -588,7 +588,13 @@ If development starts tomorrow: **Hour 0–24** — finalize DB schema, repo/CI,
 Bot core (start/language/welcome/link/inbox/message-detail/delete/report/block) · no-login sender web page with rate limiting + abuse filter + abuse-warning interstitial · human moderation queue · share-card Variant A · genuine batched notifications · privacy policy · core analytics.
 
 # DEFER
-Weekly recap, Variant B/C cards, native sponsored inbox card, Founder Dashboard, AI classification (moderation V2), Mini App, Shivir Ads platform, reactions.
+Weekly recap, Variant B/C cards, native sponsored inbox card, Founder Dashboard, AI moderation V2+, Mini App, Shivir Ads, reactions, reply-to-sender.
 
-> **Note:** This document was pasted into the assistant at 2026-09-12 and was cut off by a 50,000-character message limit at the point above ("DEFER" section). If there is more content beyond this point (e.g. further roadmap phases, appendices, or the "DO NOT BUILD" list details), it was not captured here — re-paste the remainder in a follow-up message if it exists, and it can be appended to this file.
-</content>
+# NEVER BUILD
+Fake messages/notifications/typing/viewers/crushes/sender-hints; deceptive or paid identity-reveal; manipulative subscriptions; public harassment feed; banner-style ads; any feature that fails the Quality Bar's "trust" or "safety" test.
+
+# NEXT 72 HOURS
+See "Final Answer: Next 72 Hours" above.
+
+# FINAL LAUNCH CRITERIA
+All BUILD NOW items shipped and passing their acceptance criteria · Launch Readiness Checklist fully green · Decision Gates 1–3 instrumented (not yet necessarily passed — instrumented, so real data starts flowing from day one) · zero known unresolved L3-severity safety gaps · Uzbek/Russian abuse lexicon v1 live · privacy policy published.
