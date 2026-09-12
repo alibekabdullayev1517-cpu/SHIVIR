@@ -21,6 +21,7 @@ from core.services.links import (
     create_link,
     get_active_link_for_owner,
     get_or_create_user,
+    has_any_link,
     set_display_name,
 )
 
@@ -78,8 +79,13 @@ async def on_create_link(callback: CallbackQuery, session: AsyncSession, setting
 
     await track("onboarding_completed", user_id=tg_user_id)
 
+    is_first_ever_link = not await has_any_link(session, tg_user_id)
     link = await create_link(session, owner_user_id=tg_user_id)
     await track("link_created", user_id=tg_user_id, link_id=link.id)
+    if is_first_ever_link:
+        # The viral-loop signal: someone who discovered Shivir (via a share,
+        # the meme channel, etc.) and created their first-ever link.
+        await track("new_link_created", user_id=tg_user_id, link_id=link.id)
 
     await _render_link_ready(callback.message, user.lang, settings, link.token, tg_user_id, edit=True)
     await callback.answer()

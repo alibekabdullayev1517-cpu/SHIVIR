@@ -29,6 +29,17 @@ async def set_display_name(session: AsyncSession, user: User, display_name: str 
         await session.commit()
 
 
+async def has_any_link(session: AsyncSession, owner_user_id: int) -> bool:
+    """Whether this owner has ever created a link before (active or not) —
+    distinguishes the viral-loop's `new_link_created` signal (a person who
+    discovered Shivir via a share and created their first-ever link) from the
+    general `link_created` event, which fires on every creation."""
+    result = await session.execute(
+        select(PublicLink.id).where(PublicLink.owner_user_id == owner_user_id).limit(1)
+    )
+    return result.scalars().first() is not None
+
+
 async def get_active_link_for_owner(session: AsyncSession, owner_user_id: int) -> PublicLink | None:
     result = await session.execute(
         select(PublicLink).where(
