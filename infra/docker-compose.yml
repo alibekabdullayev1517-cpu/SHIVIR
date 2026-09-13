@@ -4,10 +4,17 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: shivir
-      POSTGRES_PASSWORD: shivir
+      # Required, no default — fails loudly rather than silently starting
+      # Postgres with a blank superuser password. Set in .env (see
+      # .env.example) and run compose with --env-file .env from the repo
+      # root: `docker compose --env-file .env -f infra/docker-compose.yml up -d`.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env — see .env.example}
       POSTGRES_DB: shivir
     ports:
-      - "5432:5432"
+      # Bound to loopback only: reachable as localhost:5432 from the host
+      # (where the app's systemd units run — see infra/DEPLOYMENT.md), never
+      # from outside the machine. DATABASE_URL is unaffected by this change.
+      - "127.0.0.1:5432:5432"
     volumes:
       - shivir_postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -20,7 +27,9 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      # Loopback only — see the postgres service's port comment above.
+      # REDIS_URL (redis://localhost:6379/0) is unaffected by this change.
+      - "127.0.0.1:6379:6379"
     volumes:
       - shivir_redis_data:/data
     healthcheck:

@@ -32,7 +32,8 @@ Edit `.env` and fill in real values — **never commit this file**:
 - `BOT_TOKEN` — from @BotFather
 - `BOT_USERNAME` — your bot's username (no `@`)
 - `WEB_BASE_URL` — the public HTTPS URL senders will land on, e.g. `https://shivir.example.com`
-- `DATABASE_URL` — `postgresql+asyncpg://shivir:<password>@localhost:5432/shivir`
+- `POSTGRES_PASSWORD` — a strong random value (`python -c "import secrets; print(secrets.token_urlsafe(24))"`); used by `infra/docker-compose.yml` to set the Postgres superuser password — compose refuses to start without it
+- `DATABASE_URL` — `postgresql+asyncpg://shivir:<same password as POSTGRES_PASSWORD>@localhost:5432/shivir`
 - `REDIS_URL` — `redis://localhost:6379/0`
 - `ADMIN_TG_USER_IDS` — your own Telegram user ID(s), comma-separated, for `/modqueue` access
 
@@ -40,11 +41,18 @@ Edit `.env` and fill in real values — **never commit this file**:
 
 Either install Postgres/Redis directly on the VPS, or run them via the
 provided Compose file (works equally well in production, one less thing to
-manage by hand):
+manage by hand). Run it from the repo root with `--env-file .env` — the
+compose file lives in `infra/`, but `.env` (with `POSTGRES_PASSWORD`) is at
+the repo root, and compose only auto-discovers a `.env` next to the compose
+file itself:
 
 ```bash
-docker compose -f infra/docker-compose.yml up -d
+docker compose --env-file .env -f infra/docker-compose.yml up -d
 ```
+
+Both Postgres (5432) and Redis (6379) are bound to `127.0.0.1` only — reachable
+from the app running on this same host (as `localhost`, matching `DATABASE_URL`/
+`REDIS_URL` in `.env` unchanged), never from outside the machine.
 
 Then run migrations:
 
