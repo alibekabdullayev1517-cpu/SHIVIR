@@ -8,11 +8,26 @@ from core.models import PublicLink, User
 
 
 async def get_or_create_user(session: AsyncSession, tg_user_id: int, lang: str = "uz") -> User:
+    """Same check-then-insert race as create_link()/regenerate_link() below —
+    concurrent calls for the same tg_user_id (e.g. Telegram redelivering an
+    update, or two overlapping handler invocations) can both see no existing
+    row and both try to insert one. tg_user_id is the primary key, so the
+    loser gets an IntegrityError rather than silently overwriting anything;
+    on that, return whichever row actually won instead of raising."""
     user = await session.get(User, tg_user_id)
-    if user is None:
-        user = User(tg_user_id=tg_user_id, lang=lang)
-        session.add(user)
+    if user is not None:
+        return user
+
+    user = User(tg_user_id=tg_user_id, lang=lang)
+    session.add(user)
+    try:
         await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        winner = await session.get(User, tg_user_id)
+        if winner is not None:
+            return winner
+        raise
     return user
 
 

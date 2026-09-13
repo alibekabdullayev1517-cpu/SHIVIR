@@ -1,8 +1,11 @@
-"""Regression test for a real TOCTOU race in create_link()/regenerate_link():
-concurrent requests from the same user (e.g. a double-tapped button) used to
-be able to create two simultaneously-active links, since the check
-("does an active link exist?") and the insert weren't atomic. Fixed with a
-partial unique index (core/models.py) plus IntegrityError handling.
+"""Regression tests for real TOCTOU races in core/services/links.py:
+concurrent requests from the same user (e.g. a double-tapped button, or
+Telegram redelivering an update) used to be able to create two
+simultaneously-active links, or crash get_or_create_user() outright, since
+the check ("does a row already exist?") and the insert weren't atomic.
+create_link()/regenerate_link() are fixed with a partial unique index
+(core/models.py) plus IntegrityError handling; get_or_create_user() is fixed
+with IntegrityError handling against the users table's own primary key.
 """
 
 import asyncio
@@ -56,3 +59,19 @@ async def test_concurrent_regenerate_link_never_produces_two_active_links(db_ses
             )
         )
         assert count.scalar_one() == 1
+
+
+async def test_concurrent_get_or_create_user_never_raises_or_duplicates(db_session, clean_tables):
+    async def _get_or_create():
+        async with SessionLocal() as session:
+            return await get_or_create_user(session, 20003, lang="uz")
+
+    results = await asyncio.gather(*(_get_or_create() for _ in range(8)))
+
+    assert all(r.tg_user_id == 20003 for r in results)  # no exception, everyone got a row
+
+    async with SessionLocal() as session:
+        count = await session.execute(
+            select(func.count(User.tg_user_id)).where(User.tg_user_id == 20003)
+        )
+        assert count.scalar_one() == 1  # exactly one users row, not eight attempts colliding

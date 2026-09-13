@@ -33,6 +33,31 @@ async def test_start_command_first_time_shows_language(db_session, clean_tables)
     assert user is not None
 
 
+async def test_start_command_first_time_does_not_violate_bot_started_fk(db_session, clean_tables):
+    """Regression: track("bot_started", ...) used to fire in its own,
+    independent session/transaction (see core/analytics.py) *before* the new
+    user's row was committed in cmd_start()'s own session. events.user_id is
+    a real FK to users.tg_user_id, so under a database that actually enforces
+    it (Postgres always; SQLite here since core/db.py now turns
+    PRAGMA foreign_keys=ON per-connection) that insert would be rejected.
+    This must complete without raising, and the event's user_id must
+    reference a row that really exists."""
+    from sqlalchemy import select
+
+    from core.models import Event
+
+    message = FakeMessage(user_id=1003, text="/start")
+    await start.cmd_start(message, db_session, settings)  # must not raise IntegrityError
+
+    user = await db_session.get(User, 1003)
+    assert user is not None
+
+    result = await db_session.execute(select(Event).where(Event.name == "bot_started", Event.user_id == 1003))
+    event = result.scalars().first()
+    assert event is not None
+    assert event.props["is_returning"] is False
+
+
 async def test_start_command_returning_user_skips_language(db_session, clean_tables):
     db_session.add(User(tg_user_id=1002, lang="uz"))
     await db_session.commit()

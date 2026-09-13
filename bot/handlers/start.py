@@ -35,17 +35,22 @@ async def cmd_start(message: Message, session: AsyncSession, settings: Settings)
     tg_user_id = message.from_user.id
     existing = await session.get(User, tg_user_id)
     is_returning = existing is not None
-
     payload = message.text.split(maxsplit=1)[1] if " " in (message.text or "") else None
-    await track(
-        "bot_started",
-        user_id=tg_user_id,
-        source="deep_link" if payload else "organic",
-        is_returning=is_returning,
-    )
 
+    # track() opens its own independent session/transaction (see
+    # core/analytics.py) — it must never run before the user row it
+    # references is committed, or Postgres rejects the insert (events.user_id
+    # is a real FK to users.tg_user_id). For a first-time user that row
+    # doesn't exist until get_or_create_user() below creates it, so track()
+    # has to happen after, not before, in that branch.
     if is_returning:
         await set_display_name(session, existing, message.from_user.first_name)
+        await track(
+            "bot_started",
+            user_id=tg_user_id,
+            source="deep_link" if payload else "organic",
+            is_returning=is_returning,
+        )
         await _send_home(message, existing.lang)
         return
 
@@ -53,6 +58,12 @@ async def cmd_start(message: Message, session: AsyncSession, settings: Settings)
     default_lang = "ru" if detected.startswith("ru") else "uz"
     user = await get_or_create_user(session, tg_user_id, lang=default_lang)
     await set_display_name(session, user, message.from_user.first_name)
+    await track(
+        "bot_started",
+        user_id=tg_user_id,
+        source="deep_link" if payload else "organic",
+        is_returning=is_returning,
+    )
     await message.answer(
         "Tilni tanlang / Выберите язык", reply_markup=language_keyboard()
     )
