@@ -1,0 +1,33 @@
+name: Tests
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: "pip"
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Run test suite
+        run: pytest -q
+
+      - name: Verify Alembic migrations apply cleanly
+        env:
+          SECRET_KEY: ci-only-not-a-real-secret
+          BOT_TOKEN: "123456:ci-placeholder"
+          DATABASE_URL: "sqlite+aiosqlite:///./ci_migration_check.db"
+        run: |
+          alembic upgrade head
+          alembic downgrade base
