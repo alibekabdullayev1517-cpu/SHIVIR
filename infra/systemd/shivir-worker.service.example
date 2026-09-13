@@ -1,6 +1,7 @@
 [Unit]
 Description=Shivir notification worker
-After=network.target postgresql.service redis-server.service
+After=network-online.target docker.service
+Wants=network-online.target
 
 [Service]
 Type=simple

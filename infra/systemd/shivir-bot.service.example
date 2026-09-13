@@ -1,6 +1,7 @@
 [Unit]
 Description=Shivir Telegram bot (aiogram, long polling)
-After=network.target postgresql.service redis-server.service
+After=network-online.target docker.service
+Wants=network-online.target
 
 [Service]
 Type=simple
