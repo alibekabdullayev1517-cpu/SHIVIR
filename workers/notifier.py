@@ -57,7 +57,10 @@ async def _deliver(bot: Bot, session: AsyncSession, message_id: int) -> None:
         except TelegramForbiddenError:
             recipient.blocked_bot = True
             await session.commit()
-            logger.info("Recipient %s has blocked the bot; dropping notification.", recipient.tg_user_id)
+            # No Telegram user ID in the log line — that's a real identifier
+            # tied to a person, and message_id is enough to correlate via the
+            # DB if this ever needs investigating.
+            logger.info("Recipient has blocked the bot; dropping notification for message %s.", message_id)
             return
         except Exception:
             logger.exception("Delivery attempt %s/%s failed for message %s", attempt, MAX_ATTEMPTS, message_id)

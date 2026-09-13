@@ -1,6 +1,7 @@
 """Personal-link lifecycle: create, look up, regenerate/disable."""
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.models import PublicLink, User
@@ -51,14 +52,28 @@ async def get_active_link_for_owner(session: AsyncSession, owner_user_id: int) -
 
 
 async def create_link(session: AsyncSession, owner_user_id: int) -> PublicLink:
-    """Generate (or return the existing) personal link — zero form-filling, per spec."""
+    """Generate (or return the existing) personal link — zero form-filling, per spec.
+
+    The check-then-insert below is a TOCTOU race under concurrent requests
+    (e.g. a double-tapped button hitting two DB connections at once); the
+    partial unique index on (owner_user_id) WHERE active is the actual
+    guard — on a lost race we catch the IntegrityError and return whichever
+    row won, rather than erroring out or leaving two active links.
+    """
     existing = await get_active_link_for_owner(session, owner_user_id)
     if existing is not None:
         return existing
 
     link = PublicLink(owner_user_id=owner_user_id)
     session.add(link)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError:
+        await session.rollback()
+        winner = await get_active_link_for_owner(session, owner_user_id)
+        if winner is not None:
+            return winner
+        raise  # genuinely unexpected — not the race we know about
     await session.refresh(link)
     return link
 
@@ -80,7 +95,17 @@ async def regenerate_link(
 
     new_link = PublicLink(owner_user_id=owner_user_id)
     session.add(new_link)
-    await session.commit()
+    try:
+        await session.commit()
+    except IntegrityError:
+        # Lost a concurrent regenerate/create race — the partial unique index
+        # is the real guard here (see create_link()). Whichever row is now
+        # active for this owner is the correct one to hand back.
+        await session.rollback()
+        winner = await get_active_link_for_owner(session, owner_user_id)
+        if winner is not None:
+            return winner
+        raise
     await session.refresh(new_link)
     return new_link
 

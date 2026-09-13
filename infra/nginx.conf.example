@@ -31,10 +31,19 @@ server {
     ssl_protocols TLSv1.2 TLSv1.3;
 
     # Sender IPs matter for rate limiting/abuse fingerprinting — make sure this
-    # header actually reaches the app (core/services/sender.py trusts it).
+    # header actually reaches the app (web/routes/sender.py trusts the LAST
+    # entry in it, i.e. the one *this* directive appends).
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
     proxy_set_header Host $host;
+
+    # Belt-and-suspenders with the app's own security-headers middleware:
+    # /static/ below is served directly by Nginx (never reaches the Python
+    # app), so headers set only in app code would never apply to it.
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header Referrer-Policy "no-referrer" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
 
     location /static/ {
         alias /opt/shivir/web/static/;

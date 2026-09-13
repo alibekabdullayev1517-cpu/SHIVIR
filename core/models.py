@@ -21,6 +21,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -82,6 +83,22 @@ class PublicLink(Base):
 
     owner: Mapped["User"] = relationship(back_populates="links")
     messages: Mapped[list["Message"]] = relationship(back_populates="link", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        # Enforces "at most one active link per owner" at the DB level, not
+        # just in application code — a plain check-then-insert in
+        # create_link()/regenerate_link() is a TOCTOU race under concurrent
+        # requests (e.g. a double-tapped button hitting two DB connections
+        # at once), which two independent SQLite-only tests won't surface
+        # but a real multi-connection Postgres deployment will.
+        Index(
+            "uq_one_active_link_per_owner",
+            "owner_user_id",
+            unique=True,
+            postgresql_where=text("active = true"),
+            sqlite_where=text("active = 1"),
+        ),
+    )
 
 
 class Message(Base):

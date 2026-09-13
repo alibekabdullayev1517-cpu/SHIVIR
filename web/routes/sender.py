@@ -45,8 +45,18 @@ def get_redis(request: Request) -> Redis:
 
 
 def client_fingerprint(request: Request, settings: Settings) -> str:
+    # SECURITY: take the LAST hop in X-Forwarded-For, not the first.
+    # X-Forwarded-For is a client-supplied request header — anything in it
+    # except the entry appended by our own (trusted, single-hop) Nginx proxy
+    # is attacker-controlled. Taking the first entry let any sender forge a
+    # fresh fingerprint on every request (`X-Forwarded-For: 1.2.3.4`), fully
+    # defeating rate limiting and blocks. Nginx appends the real connecting
+    # IP as the last item via `proxy_set_header X-Forwarded-For
+    # $proxy_add_x_forwarded_for` (see infra/nginx.conf.example) — assumes
+    # exactly one trusted proxy hop, which matches this deployment (uvicorn
+    # bound to 127.0.0.1, only reachable through Nginx).
     forwarded = request.headers.get("x-forwarded-for")
-    ip = forwarded.split(",")[0].strip() if forwarded else (request.client.host if request.client else "unknown")
+    ip = forwarded.split(",")[-1].strip() if forwarded else (request.client.host if request.client else "unknown")
     user_agent = request.headers.get("user-agent", "unknown")
     return compute_fingerprint(settings.secret_key, ip, user_agent)
 

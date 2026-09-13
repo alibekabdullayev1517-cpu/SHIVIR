@@ -11,6 +11,7 @@ from redis.asyncio import Redis
 
 from core.config import get_settings
 
+from bot.error_handler import on_error
 from bot.handlers import inbox, moderation, settings as settings_handlers, start
 from bot.middlewares import DbSessionMiddleware
 
@@ -33,10 +34,20 @@ async def main() -> None:
     dp.include_router(settings_handlers.router)
     dp.include_router(moderation.router)
 
+    # Without this, an unhandled exception (e.g. Telegram's own
+    # "message is not modified" on a double-tapped button) leaves the tap
+    # looking dead to the user — see bot/error_handler.py.
+    dp.errors.register(on_error)
+
     redis = Redis.from_url(settings.redis_url, decode_responses=True)
 
     await bot.delete_webhook(drop_pending_updates=False)
-    await dp.start_polling(bot, settings=settings, redis=redis)
+    try:
+        # close_bot_session=True (the default) already closes `bot`'s session
+        # on shutdown; `redis` is ours to close.
+        await dp.start_polling(bot, settings=settings, redis=redis)
+    finally:
+        await redis.aclose()
 
 
 if __name__ == "__main__":
