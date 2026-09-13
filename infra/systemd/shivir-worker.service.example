@@ -10,8 +10,21 @@ EnvironmentFile=/opt/shivir/.env
 ExecStart=/opt/shivir/.venv/bin/python -m workers.main
 Restart=on-failure
 RestartSec=3
+
+# Sandboxing: no filesystem writes needed in production (DB is Postgres,
+# queue is Redis, logs go to the journal).
 NoNewPrivileges=true
 PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
 
 [Install]
 WantedBy=multi-user.target

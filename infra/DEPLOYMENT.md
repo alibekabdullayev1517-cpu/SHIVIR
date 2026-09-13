@@ -93,9 +93,13 @@ Instagram's and Telegram's in-app browsers, both of which require it.
 
 ## 7. Health checks
 
-`GET /health` returns `{"status": "ok"}` and is already wired into the Nginx
-config above (`location /health`). Point any uptime monitor (UptimeRobot,
-a simple cron+curl, etc.) at `https://shivir.example.com/health`.
+`GET /health` actually checks its dependencies (a `SELECT 1` against Postgres,
+a `PING` against Redis) rather than just confirming the process is up —
+returns `{"status": "ok", "checks": {"database": true, "redis": true}}` with
+HTTP 200 when both are reachable, or `{"status": "degraded", ...}` with HTTP
+503 the moment either isn't. It's already wired into the Nginx config above
+(`location /health`). Point any uptime monitor (UptimeRobot, a simple
+cron+curl, etc.) at `https://shivir.example.com/health`.
 
 There's no equivalent single-shot health check for the bot or worker
 processes since they don't serve HTTP — use `systemctl status` /
@@ -116,6 +120,33 @@ journalctl -u shivir-worker -f
 
 `LOG_LEVEL` in `.env` controls verbosity (`INFO` in production; `DEBUG` only
 temporarily while diagnosing something, since it's noisier).
+
+**Log retention (privacy):** the master plan's privacy commitment is "no raw
+long-term IP logs." The application itself never writes a raw IP anywhere —
+verified directly, not just by design: `core/security.py`'s fingerprint hash
+is the only thing derived from it, and that's a one-way HMAC (see
+`web/routes/sender.py`'s `client_fingerprint()`). The one place a raw IP
+does legitimately exist is Nginx's own access log (standard practice, and
+uvicorn's own access log is disabled — see the `--no-access-log` flag in
+`infra/systemd/shivir-web.service.example` — specifically so there isn't a
+second copy of it). Keep that one copy bounded:
+
+```bash
+# /etc/logrotate.d/nginx already exists on most distros; confirm it has a
+# retention period, e.g.:
+#   /var/log/nginx/*.log {
+#       daily
+#       rotate 30
+#       ...
+#   }
+```
+
+And cap how long systemd keeps the bot/web/worker journal:
+
+```ini
+# /etc/systemd/journald.conf
+MaxRetentionSec=30day
+```
 
 ## 9. Backups and restore
 

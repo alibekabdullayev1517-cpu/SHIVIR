@@ -7,11 +7,29 @@ Type=simple
 User=shivir
 WorkingDirectory=/opt/shivir
 EnvironmentFile=/opt/shivir/.env
-ExecStart=/opt/shivir/.venv/bin/uvicorn web.main:app --host 127.0.0.1 --port 8000 --workers 2
+# --no-access-log: Nginx (in front of this) already logs every request with
+# the real client IP. A second copy here would just double the places a raw
+# IP address sits in logs, against the master plan's "no raw long-term IP
+# logs" privacy commitment — see infra/DEPLOYMENT.md's log-retention section
+# for where that one copy actually lives and how long it's kept.
+ExecStart=/opt/shivir/.venv/bin/uvicorn web.main:app --host 127.0.0.1 --port 8000 --workers 2 --no-access-log
 Restart=on-failure
 RestartSec=3
+
+# Sandboxing: no filesystem writes needed in production (templates/static are
+# read-only assets, DB is Postgres, cache is Redis, logs go to the journal).
 NoNewPrivileges=true
 PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
 
 [Install]
 WantedBy=multi-user.target

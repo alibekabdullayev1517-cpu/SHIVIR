@@ -30,7 +30,9 @@ async def _make_link(db_session, owner_id: int, lang: str = "uz"):
 async def test_health_check(client):
     resp = await client.get("/health")
     assert resp.status_code == 200
-    assert resp.json() == {"status": "ok"}
+    body = resp.json()
+    assert body["status"] == "ok"
+    assert body["checks"] == {"database": True, "redis": True}
 
 
 async def test_invalid_token_returns_404_generic_message(client):

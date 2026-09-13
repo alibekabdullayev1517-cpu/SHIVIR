@@ -10,8 +10,23 @@ EnvironmentFile=/opt/shivir/.env
 ExecStart=/opt/shivir/.venv/bin/python -m bot.main
 Restart=on-failure
 RestartSec=3
+
+# Sandboxing: this process only needs network access (Telegram API, Postgres,
+# Redis) and its own venv/code — no filesystem writes at all in production
+# (DB is Postgres, cache is Redis, logs go to the journal). Safe to lock down
+# hard with no ReadWritePaths needed.
 NoNewPrivileges=true
 PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
 
 [Install]
 WantedBy=multi-user.target
