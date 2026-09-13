@@ -20,6 +20,11 @@ htmlcov/
 *.sqlite3
 *.db
 
+# Postgres backups (infra/backup.sh writes these outside the repo by
+# default, to BACKUP_DIR=/var/backups/shivir — this is a safety net in case
+# one ever lands inside the working tree, e.g. during local testing)
+*.dump
+
 # OS
 .DS_Store
 Thumbs.db

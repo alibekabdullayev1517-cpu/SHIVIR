@@ -158,22 +158,41 @@ MaxRetentionSec=30day
 
 ## 9. Backups and restore
 
+`infra/backup.sh` reads `POSTGRES_PASSWORD` directly out of the app's own
+`.env` (just that one variable — never the whole file) and passes it to
+`pg_dump` via the `PGPASSWORD` environment variable rather than embedding it
+in a connection URL, so it never shows up in `ps aux` output. No separate
+credential to create or keep in sync with `.env`.
+
+Automated daily via a systemd timer rather than cron:
+
 ```bash
-# One-time: put a plain (non-SQLAlchemy-scheme) Postgres URL where the backup
-# script can find it — keep this out of the app's own .env, it's a separate
-# credential path used only for pg_dump/pg_restore.
-export PG_DUMP_URL="postgresql://shivir:<password>@localhost:5432/shivir"
-infra/backup.sh
+sudo cp infra/systemd/shivir-backup.service.example /etc/systemd/system/shivir-backup.service
+sudo cp infra/systemd/shivir-backup.timer.example /etc/systemd/system/shivir-backup.timer
+# edit shivir-backup.service if your paths/user differ from /opt/shivir and `shivir`
+sudo mkdir -p /var/backups/shivir && sudo chown shivir:shivir /var/backups/shivir
+sudo systemctl daemon-reload
+sudo systemctl enable --now shivir-backup.timer
+systemctl list-timers shivir-backup.timer   # confirm it's scheduled
 ```
 
-Schedule it nightly via cron (see the comment at the top of `infra/backup.sh`
-for the exact line). It keeps 14 days of backups by default.
+Run it once by hand to confirm it actually works before trusting the timer:
+
+```bash
+sudo systemctl start shivir-backup.service
+journalctl -u shivir-backup.service -n 20
+```
+
+It keeps 14 days of backups by default (`RETENTION_DAYS` in the service's
+`Environment=` lines, or override there).
 
 **Restore:**
 
 ```bash
 sudo systemctl stop shivir-bot shivir-web shivir-worker
-pg_restore --dbname="$PG_DUMP_URL" --clean --if-exists /var/backups/shivir/shivir-<timestamp>.dump
+PGPASSWORD="$(grep -E '^POSTGRES_PASSWORD=' /opt/shivir/.env | tail -n1 | cut -d '=' -f2-)" \
+  pg_restore --host=localhost --port=5432 --username=shivir --dbname=shivir \
+  --clean --if-exists /var/backups/shivir/shivir-<timestamp>.dump
 sudo systemctl start shivir-bot shivir-web shivir-worker
 ```
 
