@@ -55,6 +55,68 @@ async def test_clean_message_is_stored(db_session, clean_tables, fake_redis):
     assert stored.deleted_at is None
 
 
+async def test_rapid_resubmit_of_identical_message_is_deduplicated(db_session, clean_tables, fake_redis):
+    """A double-tap or a stale second browser tab resubmitting the exact same
+    body within seconds must not create two stored messages."""
+    link = await _make_link(db_session, 130)
+
+    first = await send_message(
+        db_session, fake_redis, settings,
+        link_id=link.id, link_active=link.active, recipient_user_id=130,
+        body="salom qalaysan", fingerprint_hash="fp-dup",
+    )
+    second = await send_message(
+        db_session, fake_redis, settings,
+        link_id=link.id, link_active=link.active, recipient_user_id=130,
+        body="salom qalaysan", fingerprint_hash="fp-dup",
+    )
+
+    assert first.status == SendStatus.STORED
+    assert second.status == SendStatus.STORED
+    assert first.message_id == second.message_id  # same row, not a duplicate
+
+    from sqlalchemy import select as sa_select
+
+    count = await db_session.execute(
+        sa_select(Message).where(Message.recipient_user_id == 130)
+    )
+    assert len(count.scalars().all()) == 1
+
+
+async def test_different_message_from_same_sender_is_not_deduplicated(db_session, clean_tables, fake_redis):
+    link = await _make_link(db_session, 131)
+
+    first = await send_message(
+        db_session, fake_redis, settings,
+        link_id=link.id, link_active=link.active, recipient_user_id=131,
+        body="first message", fingerprint_hash="fp-distinct",
+    )
+    second = await send_message(
+        db_session, fake_redis, settings,
+        link_id=link.id, link_active=link.active, recipient_user_id=131,
+        body="a genuinely different message", fingerprint_hash="fp-distinct",
+    )
+
+    assert first.message_id != second.message_id
+
+
+async def test_same_text_from_different_senders_is_not_deduplicated(db_session, clean_tables, fake_redis):
+    link = await _make_link(db_session, 132)
+
+    first = await send_message(
+        db_session, fake_redis, settings,
+        link_id=link.id, link_active=link.active, recipient_user_id=132,
+        body="happy birthday!", fingerprint_hash="fp-sender-a",
+    )
+    second = await send_message(
+        db_session, fake_redis, settings,
+        link_id=link.id, link_active=link.active, recipient_user_id=132,
+        body="happy birthday!", fingerprint_hash="fp-sender-b",
+    )
+
+    assert first.message_id != second.message_id
+
+
 async def test_abusive_message_needs_warning_before_storing(db_session, clean_tables, fake_redis):
     link = await _make_link(db_session, 14)
     result = await send_message(

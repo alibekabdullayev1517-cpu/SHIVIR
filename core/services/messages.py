@@ -5,7 +5,7 @@ used by the sender web route.
 
 import json
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 
 from redis.asyncio import Redis
@@ -19,6 +19,9 @@ from core.safety.filter import Category, Severity, analyze
 
 MAX_MESSAGE_LENGTH = 500
 NOTIFICATION_QUEUE_KEY = "shivir:notify:queue"
+# Window for collapsing an accidental double-tap / stale-second-tab
+# resubmission into the original send, rather than storing it twice.
+DUPLICATE_WINDOW_SECONDS = 10
 
 
 class SendStatus(str, Enum):
@@ -47,6 +50,24 @@ async def _is_blocked(session: AsyncSession, recipient_user_id: int, fingerprint
         )
     )
     return result.scalars().first() is not None
+
+
+async def _find_recent_duplicate(
+    session: AsyncSession, fingerprint_hash: str, link_id: int, body: str
+) -> Message | None:
+    cutoff = datetime.now(timezone.utc) - timedelta(seconds=DUPLICATE_WINDOW_SECONDS)
+    result = await session.execute(
+        select(Message)
+        .where(
+            Message.sender_fingerprint_hash == fingerprint_hash,
+            Message.link_id == link_id,
+            Message.body == body,
+            Message.created_at >= cutoff,
+        )
+        .order_by(Message.created_at.asc())
+        .limit(1)
+    )
+    return result.scalars().first()
 
 
 async def _enqueue_notification(redis: Redis, message_id: int) -> None:
@@ -99,6 +120,13 @@ async def send_message(
             status=SendStatus.NEEDS_WARNING,
             warning_category=category.value if category else None,
         )
+
+    duplicate = await _find_recent_duplicate(session, fingerprint_hash, link_id, body)
+    if duplicate is not None:
+        # A double-tap or a stale second browser tab resubmitting the exact
+        # same message — treat as the same send, not two messages. Genuinely
+        # sending the same text again later (after the window) is still fine.
+        return SendResult(status=SendStatus.STORED, message_id=duplicate.id)
 
     message = Message(
         link_id=link_id,
