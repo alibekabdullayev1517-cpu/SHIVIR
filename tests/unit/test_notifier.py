@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timedelta, timezone
 
 from aiogram.exceptions import TelegramForbiddenError, TelegramRetryAfter
 
@@ -88,3 +89,65 @@ async def test_gives_up_after_max_attempts(db_session, clean_tables, fake_redis,
     await notifier.process_one(bot, db_session, fake_redis, timeout=1)
 
     assert bot.sent == []  # never succeeded, but the worker didn't crash either
+
+
+async def _make_message_without_enqueueing(db_session, recipient_id: int, age_seconds: int) -> int:
+    """Creates a stored, un-notified message directly (bypassing send_message,
+    so it's never pushed to the Redis queue) — simulates a queue entry lost to
+    a Redis restart/eviction."""
+    db_session.add(User(tg_user_id=recipient_id))
+    await db_session.commit()
+    link = await create_link(db_session, owner_user_id=recipient_id)
+    message = Message(
+        link_id=link.id,
+        recipient_user_id=recipient_id,
+        body="lost notification",
+        sender_fingerprint_hash="fp-lost",
+        created_at=datetime.now(timezone.utc) - timedelta(seconds=age_seconds),
+    )
+    db_session.add(message)
+    await db_session.commit()
+    await db_session.refresh(message)
+    return message.id
+
+
+async def test_recover_stale_messages_requeues_lost_notification(db_session, clean_tables, fake_redis):
+    message_id = await _make_message_without_enqueueing(db_session, 4006, age_seconds=300)
+
+    recovered = await notifier.recover_stale_messages(db_session, fake_redis)
+
+    assert recovered == 1
+    queued = await fake_redis.lrange(NOTIFICATION_QUEUE_KEY, 0, -1)
+    assert json.loads(queued[0])["message_id"] == message_id
+
+
+async def test_recover_stale_messages_ignores_recent_messages(db_session, clean_tables, fake_redis):
+    await _make_message_without_enqueueing(db_session, 4007, age_seconds=5)
+
+    recovered = await notifier.recover_stale_messages(db_session, fake_redis)
+
+    assert recovered == 0
+    assert await fake_redis.llen(NOTIFICATION_QUEUE_KEY) == 0
+
+
+async def test_recover_stale_messages_ignores_already_notified(db_session, clean_tables, fake_redis):
+    message_id = await _make_message_without_enqueueing(db_session, 4008, age_seconds=300)
+    message = await db_session.get(Message, message_id)
+    message.notified_at = datetime.now(timezone.utc)
+    await db_session.commit()
+
+    recovered = await notifier.recover_stale_messages(db_session, fake_redis)
+
+    assert recovered == 0
+
+
+async def test_recover_stale_messages_ignores_deleted(db_session, clean_tables, fake_redis):
+    message_id = await _make_message_without_enqueueing(db_session, 4009, age_seconds=300)
+    message = await db_session.get(Message, message_id)
+    message.deleted_at = datetime.now(timezone.utc)
+    message.body = ""
+    await db_session.commit()
+
+    recovered = await notifier.recover_stale_messages(db_session, fake_redis)
+
+    assert recovered == 0

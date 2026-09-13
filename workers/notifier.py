@@ -14,11 +14,13 @@ Retry behavior:
 import asyncio
 import json
 import logging
-from datetime import datetime, timezone
+import time
+from datetime import datetime, timedelta, timezone
 
 from aiogram import Bot
 from aiogram.exceptions import TelegramForbiddenError, TelegramRetryAfter
 from redis.asyncio import Redis
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.analytics import track
@@ -32,6 +34,15 @@ MAX_ATTEMPTS = 3
 BASE_BACKOFF_SECONDS = 2
 # Stays comfortably under Telegram's ~30 msg/sec global send limit.
 THROTTLE_SECONDS = 0.05
+
+# The Redis queue is not durable across a Redis restart/eviction between RDB
+# snapshots — a queued-but-unpopped entry can simply vanish, silently losing
+# a genuine notification with no retry, which would fail the master plan's
+# "reliable retry behavior" requirement. This periodic sweep is the backstop:
+# any message old enough that it should have been delivered by now, but
+# wasn't, gets re-enqueued from Postgres (the durable source of truth).
+SWEEP_INTERVAL_SECONDS = 60
+STALE_AFTER_SECONDS = 120
 
 
 async def _deliver(bot: Bot, session: AsyncSession, message_id: int) -> None:
@@ -84,8 +95,38 @@ async def process_one(bot: Bot, session: AsyncSession, redis: Redis, timeout: in
     return True
 
 
+async def recover_stale_messages(session: AsyncSession, redis: Redis) -> int:
+    """Re-enqueues any message that's old enough to have been delivered
+    already but wasn't — the backstop for a Redis queue entry lost to a
+    restart/eviction. Postgres (notified_at) is the durable source of truth;
+    Redis is just the low-latency delivery signal."""
+    threshold = datetime.now(timezone.utc) - timedelta(seconds=STALE_AFTER_SECONDS)
+    result = await session.execute(
+        select(Message.id).where(
+            Message.notified_at.is_(None),
+            Message.deleted_at.is_(None),
+            Message.created_at < threshold,
+        )
+    )
+    ids = [row[0] for row in result.all()]
+    for message_id in ids:
+        await redis.rpush(NOTIFICATION_QUEUE_KEY, json.dumps({"message_id": message_id}))
+    return len(ids)
+
+
 async def run_forever(bot: Bot, session_factory, redis: Redis) -> None:
     logger.info("Notification worker started.")
+    last_sweep = 0.0
     while True:
         async with session_factory() as session:
             await process_one(bot, session, redis)
+
+            now = time.monotonic()
+            if now - last_sweep >= SWEEP_INTERVAL_SECONDS:
+                recovered = await recover_stale_messages(session, redis)
+                if recovered:
+                    logger.warning(
+                        "Recovered %s stale un-notified message(s) — likely a lost Redis queue entry.",
+                        recovered,
+                    )
+                last_sweep = now
