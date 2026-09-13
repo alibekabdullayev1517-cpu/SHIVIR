@@ -64,7 +64,13 @@ async def on_moderation_decision(callback: CallbackQuery, session: AsyncSession,
         await callback.answer("Not found.", show_alert=True)
         return
 
+    # apply_moderator_decision() is idempotent: result.action/moderator reflect
+    # whichever decision actually resolved this target first, which may not be
+    # this tap (a double-tap, or another moderator acting first) — the message
+    # is worded generically-correct for both cases rather than assuming "this
+    # tap just resolved it".
     await callback.message.edit_text(
-        f"{callback.message.text}\n\n✅ {decision} by {callback.from_user.id}", parse_mode=None
+        f"{callback.message.text}\n\n✅ resolved: {result.action} by {result.moderator}",
+        parse_mode=None,
     )
     await callback.answer()

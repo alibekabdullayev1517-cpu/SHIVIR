@@ -116,14 +116,39 @@ async def _resolve_link_for_target(session: AsyncSession, target: str) -> Public
     return None
 
 
+async def _existing_human_decision(session: AsyncSession, target: str) -> ModerationAction | None:
+    """The first human (non-"system") decision recorded against this target,
+    if any — that's what makes a target "resolved". Auto-generated rows
+    (auto_flag, the link auto-disable, the mass-abuse escalation) all use
+    moderator="system" and never count as a resolution on their own; a human
+    remains the final authority on anything above L1, per the master plan."""
+    result = await session.execute(
+        select(ModerationAction)
+        .where(ModerationAction.target == target, ModerationAction.moderator != "system")
+        .order_by(ModerationAction.created_at.asc())
+        .limit(1)
+    )
+    return result.scalars().first()
+
+
 async def apply_moderator_decision(
     session: AsyncSession, moderator_id: int, action_id: int, decision: str
 ) -> ModerationAction | None:
     """Every moderator action is a new append-only audit-log row, per spec, never
-    a mutation of the original auto-flag entry."""
+    a mutation of the original auto-flag entry.
+
+    Idempotent: if this target already has a human decision (a moderator
+    double-tapping the same button, or two moderators racing on the same
+    item), that existing decision is returned as-is rather than appending a
+    duplicate — the target was already resolved by whichever came first.
+    """
     original = await session.get(ModerationAction, action_id)
     if original is None:
         return None
+
+    existing = await _existing_human_decision(session, original.target)
+    if existing is not None:
+        return existing
 
     entry = ModerationAction(
         target=original.target,
@@ -144,11 +169,24 @@ async def apply_moderator_decision(
 
 
 async def moderation_queue(session: AsyncSession, limit: int = 50) -> list[ModerationAction]:
-    """Severity-then-recency queue for human moderators (bot-command based in V1;
-    no separate admin dashboard yet — that's V2+)."""
+    """Severity-then-recency queue of items with no human decision yet.
+
+    Resolved/open state is derived from existing data, not a separate
+    stored flag: a target is "resolved" the moment any row with
+    moderator != "system" exists for it (see _existing_human_decision).
+    Human decisions are themselves append-only audit rows and are never
+    surfaced back into the queue as if they were new items needing review.
+    """
+    resolved_targets = (
+        select(ModerationAction.target).where(ModerationAction.moderator != "system").distinct()
+    )
+
     severity_order = {"L3": 0, "L2": 1, "L1": 2}
     result = await session.execute(
-        select(ModerationAction).order_by(ModerationAction.created_at.desc()).limit(limit * 3)
+        select(ModerationAction)
+        .where(ModerationAction.moderator == "system", ModerationAction.target.notin_(resolved_targets))
+        .order_by(ModerationAction.created_at.desc())
+        .limit(limit * 3)
     )
     actions = list(result.scalars().all())
     actions.sort(key=lambda a: (severity_order.get(a.severity, 3), -a.created_at.timestamp()))

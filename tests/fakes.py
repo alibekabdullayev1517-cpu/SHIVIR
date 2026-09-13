@@ -44,12 +44,12 @@ class FakeBot:
         self.sent: list[dict] = []
         self._side_effects = list(side_effects or [])
 
-    async def send_message(self, chat_id: int, text: str):
+    async def send_message(self, chat_id: int, text: str, parse_mode=None, **kwargs):
         if self._side_effects:
             effect = self._side_effects.pop(0)
             if isinstance(effect, Exception):
                 raise effect
-        self.sent.append({"chat_id": chat_id, "text": text})
+        self.sent.append({"chat_id": chat_id, "text": text, "parse_mode": parse_mode, **kwargs})
 
 
 class FakeCallbackQuery:

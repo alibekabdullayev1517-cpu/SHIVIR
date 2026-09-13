@@ -71,6 +71,16 @@ def test_backup_service_example_exists_and_runs_the_script():
     assert "ENV_FILE=" in content
 
 
+def test_backup_service_retention_days_matches_what_deployment_doc_claims():
+    """Regression: DEPLOYMENT.md told operators to override retention via
+    "RETENTION_DAYS in the service's Environment= lines" while no such line
+    actually existed in the file — the documented override point has to be
+    real, and its stated value (14) has to match backup.sh's own default."""
+    service_content = _read(BACKUP_SERVICE)
+    assert "Environment=RETENTION_DAYS=14" in service_content
+    assert "RETENTION_DAYS=\"${RETENTION_DAYS:-14}\"" in _read(BACKUP_SCRIPT)
+
+
 def test_backup_timer_example_runs_daily_and_catches_up_missed_runs():
     content = _read(BACKUP_TIMER)
     assert "OnCalendar=daily" in content

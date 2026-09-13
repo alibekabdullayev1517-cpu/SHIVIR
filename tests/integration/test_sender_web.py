@@ -148,3 +148,56 @@ async def test_message_started_beacon_ignores_unknown_events(client, db_session,
 
     result = await db_session.execute(select(Event).where(Event.name == "something_else"))
     assert result.scalars().first() is None
+
+
+# --- P2: /track must fail safe on malformed/empty telemetry, never a 500 ---
+
+
+async def test_track_malformed_json_body_is_ignored_not_500(client, db_session, clean_tables):
+    link = await _make_link(db_session, 2008)
+    resp = await client.post(
+        f"/s/{link.token}/track",
+        content=b"{not valid json",
+        headers={"Content-Type": "application/json"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "ignored"
+
+
+async def test_track_empty_body_is_ignored_not_500(client, db_session, clean_tables):
+    link = await _make_link(db_session, 2009)
+    resp = await client.post(
+        f"/s/{link.token}/track",
+        content=b"",
+        headers={"Content-Type": "application/json"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "ignored"
+
+
+async def test_track_valid_json_non_object_is_ignored_not_500(client, db_session, clean_tables):
+    """Valid JSON that isn't an object (e.g. a bare array) has no .get() —
+    must be treated as ignored, not crash on the attribute access."""
+    link = await _make_link(db_session, 2010)
+    resp = await client.post(
+        f"/s/{link.token}/track",
+        content=b"[1, 2, 3]",
+        headers={"Content-Type": "application/json"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "ignored"
+
+
+async def test_track_valid_message_started_event_still_recorded_after_fix(client, db_session, clean_tables):
+    """The fail-safe handling above must not weaken the legitimate path."""
+    from sqlalchemy import select
+
+    from core.models import Event
+
+    link = await _make_link(db_session, 2011)
+    resp = await client.post(f"/s/{link.token}/track", json={"name": "message_started"})
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "ok"
+
+    result = await db_session.execute(select(Event).where(Event.name == "message_started"))
+    assert result.scalars().first() is not None

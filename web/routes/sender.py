@@ -179,8 +179,16 @@ async def sender_track_event(token: str, request: Request, session: AsyncSession
     """The only client-triggered analytics beacon. Deliberately allow-lists a
     single event: message_started can only be observed client-side (first
     keystroke), and carries nothing sender-identifying."""
-    body = await request.json()
-    if body.get("name") != "message_started":
+    try:
+        body = await request.json()
+    except Exception:
+        # Malformed/empty/non-JSON body — treat as benign telemetry noise
+        # (a network hiccup, a browser quirk, someone probing the endpoint),
+        # not a server error. Same response as an unrecognized event name;
+        # never a 500 for input this expected to be untrusted and low-stakes.
+        return JSONResponse({"status": "ignored"})
+
+    if not isinstance(body, dict) or body.get("name") != "message_started":
         return JSONResponse({"status": "ignored"})
 
     link = await get_link_by_token(session, token)

@@ -10,6 +10,7 @@ User=shivir
 WorkingDirectory=/opt/shivir
 Environment=ENV_FILE=/opt/shivir/.env
 Environment=BACKUP_DIR=/var/backups/shivir
+Environment=RETENTION_DAYS=14
 ExecStart=/opt/shivir/infra/backup.sh
 
 # Sandboxing: unlike the app services, this one genuinely needs one write
