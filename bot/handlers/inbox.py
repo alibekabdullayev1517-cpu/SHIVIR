@@ -3,7 +3,7 @@
 from datetime import datetime, timezone
 
 from aiogram import F, Router
-from aiogram.types import BufferedInputFile, CallbackQuery
+from aiogram.types import BufferedInputFile, CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from cards.render import render_variant_a
@@ -29,28 +29,39 @@ from bot.keyboards import (
 
 router = Router(name="inbox")
 
+_INBOX_LABELS = {"📥 Qutim", "📥 Входящие"}
 
-async def _render_inbox(callback: CallbackQuery, session: AsyncSession) -> None:
-    tg_user_id = callback.from_user.id
+
+async def _inbox_view(session: AsyncSession, settings: Settings, tg_user_id: int) -> tuple[str, object]:
     user = await get_or_create_user(session, tg_user_id)
     messages = await get_inbox_messages(session, tg_user_id)
     unread = await count_unread(session, tg_user_id)
+    active_link = await get_active_link_for_owner(session, tg_user_id)
+    share_url = build_sender_url(settings.web_base_url, active_link.token) if active_link else None
 
     await track("inbox_opened", user_id=tg_user_id, unread_count=unread)
 
     if not messages:
-        await callback.message.edit_text(
-            t("inbox_empty", user.lang), reply_markup=inbox_keyboard(user.lang, [])
-        )
-    else:
-        title = "📥 Qutingiz" if user.lang == "uz" else "📥 Входящие"
-        await callback.message.edit_text(title, reply_markup=inbox_keyboard(user.lang, messages))
+        return t("inbox_empty", user.lang), inbox_keyboard(user.lang, [], share_url)
+    title = "📥 Qutingiz" if user.lang == "uz" else "📥 Входящие"
+    return title, inbox_keyboard(user.lang, messages, share_url)
+
+
+async def _render_inbox(callback: CallbackQuery, session: AsyncSession, settings: Settings) -> None:
+    text, markup = await _inbox_view(session, settings, callback.from_user.id)
+    await callback.message.edit_text(text, reply_markup=markup)
 
 
 @router.callback_query(F.data == "inbox:open")
-async def on_inbox_open(callback: CallbackQuery, session: AsyncSession) -> None:
-    await _render_inbox(callback, session)
+async def on_inbox_open(callback: CallbackQuery, session: AsyncSession, settings: Settings) -> None:
+    await _render_inbox(callback, session, settings)
     await callback.answer()
+
+
+@router.message(F.text.in_(_INBOX_LABELS))
+async def on_inbox_open_reply_button(message: Message, session: AsyncSession, settings: Settings) -> None:
+    text, markup = await _inbox_view(session, settings, message.from_user.id)
+    await message.answer(text, reply_markup=markup)
 
 
 @router.callback_query(F.data.startswith("msg:open:"))
@@ -91,14 +102,14 @@ async def on_delete_prompt(callback: CallbackQuery, session: AsyncSession) -> No
 
 
 @router.callback_query(F.data.startswith("msg:deleteconfirm:"))
-async def on_delete_confirm(callback: CallbackQuery, session: AsyncSession) -> None:
+async def on_delete_confirm(callback: CallbackQuery, session: AsyncSession, settings: Settings) -> None:
     message_id = int(callback.data.split(":")[2])
     tg_user_id = callback.from_user.id
     message = await get_message_for_recipient(session, message_id, tg_user_id)
     if message is not None:
         await delete_message(session, message)
         await track("message_deleted", user_id=tg_user_id, message_id=message_id)
-    await _render_inbox(callback, session)
+    await _render_inbox(callback, session, settings)
     await callback.answer()
 
 
@@ -119,7 +130,7 @@ async def on_block_prompt(callback: CallbackQuery, session: AsyncSession) -> Non
 
 
 @router.callback_query(F.data.startswith("msg:blockconfirm:"))
-async def on_block_confirm(callback: CallbackQuery, session: AsyncSession) -> None:
+async def on_block_confirm(callback: CallbackQuery, session: AsyncSession, settings: Settings) -> None:
     message_id = int(callback.data.split(":")[2])
     tg_user_id = callback.from_user.id
     user = await get_or_create_user(session, tg_user_id)
@@ -128,7 +139,7 @@ async def on_block_confirm(callback: CallbackQuery, session: AsyncSession) -> No
         await block_sender(session, tg_user_id, message.sender_fingerprint_hash)
         await track("sender_blocked", user_id=tg_user_id, message_id=message_id)
         await callback.answer(t("block_confirmation", user.lang), show_alert=True)
-    await _render_inbox(callback, session)
+    await _render_inbox(callback, session, settings)
 
 
 @router.callback_query(F.data.startswith("msg:report:"))
@@ -158,7 +169,7 @@ async def on_report_reason(callback: CallbackQuery, session: AsyncSession, setti
     await track("report_created", user_id=tg_user_id, message_id=message_id, reason=reason)
 
     await callback.answer(t("report_confirmation", user.lang), show_alert=True)
-    await _render_inbox(callback, session)
+    await _render_inbox(callback, session, settings)
 
 
 @router.callback_query(F.data.startswith("msg:card:"))

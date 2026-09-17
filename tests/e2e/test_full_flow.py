@@ -70,7 +70,7 @@ async def test_full_recipient_to_sender_to_delivery_to_action_journey(db_session
 
     # 4. Recipient opens the inbox, then the message (bot).
     inbox_cb = FakeCallbackQuery(user_id=recipient_id, data="inbox:open", message=start_msg)
-    await inbox.on_inbox_open(inbox_cb, db_session)
+    await inbox.on_inbox_open(inbox_cb, db_session, settings)
     assert "Sen ajoyibsan" not in start_msg.last_text  # previews only, full body on open
 
     open_cb = FakeCallbackQuery(user_id=recipient_id, data=f"msg:open:{message.id}", message=start_msg)
@@ -87,10 +87,10 @@ async def test_full_recipient_to_sender_to_delivery_to_action_journey(db_session
     await inbox.on_report_reason(report_cb, db_session, settings)
 
     block_cb = FakeCallbackQuery(user_id=recipient_id, data=f"msg:blockconfirm:{message.id}", message=start_msg)
-    await inbox.on_block_confirm(block_cb, db_session)
+    await inbox.on_block_confirm(block_cb, db_session, settings)
 
     delete_cb = FakeCallbackQuery(user_id=recipient_id, data=f"msg:deleteconfirm:{message.id}", message=start_msg)
-    await inbox.on_delete_confirm(delete_cb, db_session)
+    await inbox.on_delete_confirm(delete_cb, db_session, settings)
 
     await db_session.refresh(message)
     assert message.body == ""

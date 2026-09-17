@@ -74,6 +74,17 @@ COPY: dict[str, dict[str, str]] = {
         "ru": "Вам пришло новое сообщение Shivir 👀",
     },
     "ads_disclosure": {"uz": "Bu — reklama", "ru": "Это реклама"},
+    "share_message": {
+        "uz": "Menga anonim xabar yubor 👀",
+        "ru": "Отправь мне анонимное сообщение 👀",
+    },
+    "main_menu_ready": {"uz": "Asosiy menyu tayyor 👇", "ru": "Главное меню готово 👇"},
+    "copy_link_toast": {
+        "uz": "Havolani nusxalash uchun yuqoridagi matnni bosing",
+        "ru": "Нажмите на ссылку выше, чтобы скопировать её",
+    },
+    "back_button": {"uz": "◀️ Orqaga", "ru": "◀️ Назад"},
+    "copy_link_cta": {"uz": "📋 Linkni nusxalash", "ru": "📋 Скопировать ссылку"},
 }
 
 

@@ -48,7 +48,7 @@ async def test_cannot_delete_another_users_message(db_session, clean_tables, fak
 
     attacker_msg = FakeMessage(user_id=7004)
     cb = FakeCallbackQuery(user_id=7004, data=f"msg:deleteconfirm:{message_id}", message=attacker_msg)
-    await inbox.on_delete_confirm(cb, db_session)
+    await inbox.on_delete_confirm(cb, db_session, settings)
 
     stored = await db_session.get(Message, message_id)
     assert stored.body == "private content"  # untouched

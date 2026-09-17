@@ -25,7 +25,9 @@ from core.services.links import (
     set_display_name,
 )
 
-from bot.keyboards import home_keyboard, language_keyboard, link_ready_keyboard, welcome_keyboard
+from bot.keyboards import language_keyboard, link_ready_keyboard, main_reply_keyboard, welcome_keyboard
+
+_LINK_LABELS = {"🔗 Havolam", "🔗 Моя ссылка"}
 
 router = Router(name="start")
 
@@ -99,44 +101,60 @@ async def on_create_link(callback: CallbackQuery, session: AsyncSession, setting
         await track("new_link_created", user_id=tg_user_id, link_id=link.id)
 
     await _render_link_ready(callback.message, user.lang, settings, link.token, tg_user_id, edit=True)
+    if is_first_ever_link:
+        # ReplyKeyboardMarkup can only be attached via a NEW message, never
+        # via editMessageText (which _render_link_ready used above) — this
+        # is the one point every brand-new user is guaranteed to pass
+        # through exactly once, so it's the natural place to attach it.
+        # Returning users already have it from _send_home on /start.
+        await callback.message.answer(t("main_menu_ready", user.lang), reply_markup=main_reply_keyboard(user.lang))
     await callback.answer()
 
 
-@router.callback_query(F.data == "link:show")
-async def on_link_show(callback: CallbackQuery, session: AsyncSession, settings: Settings) -> None:
-    tg_user_id = callback.from_user.id
+async def _show_my_link(session: AsyncSession, tg_user_id: int) -> tuple[str, str]:
     user = await get_or_create_user(session, tg_user_id)
     link = await get_active_link_for_owner(session, tg_user_id)
     if link is None:
         link = await create_link(session, owner_user_id=tg_user_id)
         await track("link_created", user_id=tg_user_id, link_id=link.id)
+    return user.lang, link.token
 
-    await _render_link_ready(callback.message, user.lang, settings, link.token, tg_user_id, edit=True)
+
+@router.callback_query(F.data == "link:show")
+async def on_link_show(callback: CallbackQuery, session: AsyncSession, settings: Settings) -> None:
+    tg_user_id = callback.from_user.id
+    lang, token = await _show_my_link(session, tg_user_id)
+    await _render_link_ready(callback.message, lang, settings, token, tg_user_id, edit=True)
     await callback.answer()
 
 
-@router.callback_query(F.data == "link:share")
-async def on_link_share(callback: CallbackQuery, session: AsyncSession, settings: Settings) -> None:
+@router.message(F.text.in_(_LINK_LABELS))
+async def on_link_show_reply_button(message: Message, session: AsyncSession, settings: Settings) -> None:
+    tg_user_id = message.from_user.id
+    lang, token = await _show_my_link(session, tg_user_id)
+    await _render_link_ready(message, lang, settings, token, tg_user_id, edit=False)
+
+
+@router.callback_query(F.data == "link:copy")
+async def on_link_copy(callback: CallbackQuery, session: AsyncSession) -> None:
     tg_user_id = callback.from_user.id
     user = await get_or_create_user(session, tg_user_id)
     link = await get_active_link_for_owner(session, tg_user_id)
     if link is None:
         link = await create_link(session, owner_user_id=tg_user_id)
 
-    await track("link_shared", user_id=tg_user_id, link_id=link.id, channel="telegram")
+    await track("link_shared", user_id=tg_user_id, link_id=link.id, channel="copy")
 
-    toast = (
-        "Havolani nusxalash uchun yuqoridagi matnni bosing"
-        if user.lang == "uz"
-        else "Нажмите на ссылку выше, чтобы скопировать её"
-    )
-    await callback.answer(toast, show_alert=True)
+    await callback.answer(t("copy_link_toast", user.lang), show_alert=True)
 
 
 @router.callback_query(F.data == "home:open")
 async def on_home_open(callback: CallbackQuery, session: AsyncSession) -> None:
     user = await get_or_create_user(session, callback.from_user.id)
-    await callback.message.edit_text(_home_text(user.lang), reply_markup=home_keyboard(user.lang))
+    # No inline keyboard needed here — the 3 main actions live on the
+    # persistent reply keyboard (main_reply_keyboard), already attached by
+    # this point for every user who can reach this screen.
+    await callback.message.edit_text(_home_text(user.lang), reply_markup=None)
     await callback.answer()
 
 
@@ -145,7 +163,7 @@ def _home_text(lang: str) -> str:
 
 
 async def _send_home(message: Message, lang: str) -> None:
-    await message.answer(_home_text(lang), reply_markup=home_keyboard(lang))
+    await message.answer(_home_text(lang), reply_markup=main_reply_keyboard(lang))
 
 
 async def _render_link_ready(
