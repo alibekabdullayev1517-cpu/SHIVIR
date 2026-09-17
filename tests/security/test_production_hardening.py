@@ -60,3 +60,20 @@ async def test_untrusted_host_header_is_rejected(fake_redis):
         resp = await client.get("/health", headers={"Host": "evil-attacker.example"})
 
     assert resp.status_code == 400
+
+
+def test_www_variant_of_web_base_url_is_trusted(monkeypatch):
+    monkeypatch.setenv("ENV", "production")
+    monkeypatch.setenv("WEB_BASE_URL", "https://shivir.online")
+    from core.config import get_settings
+
+    get_settings.cache_clear()
+    try:
+        from web.main import _trusted_hosts
+
+        hosts = _trusted_hosts(get_settings())
+        assert "shivir.online" in hosts
+        assert "www.shivir.online" in hosts
+    finally:
+        monkeypatch.undo()
+        get_settings.cache_clear()

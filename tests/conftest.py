@@ -14,6 +14,7 @@ _tmp_db = Path(tempfile.gettempdir()) / "shivir_test.db"
 if _tmp_db.exists():
     _tmp_db.unlink()
 
+os.environ.setdefault("ENV", "development")
 os.environ.setdefault("SECRET_KEY", "test-secret-key-not-for-production-use-only")
 os.environ.setdefault("BOT_TOKEN", "123456:test-token")
 os.environ.setdefault("BOT_USERNAME", "shivir_test_bot")
