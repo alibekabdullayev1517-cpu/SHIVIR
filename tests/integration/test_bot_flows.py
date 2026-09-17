@@ -91,7 +91,7 @@ async def test_inbox_open_empty_state(db_session, clean_tables):
     fake_msg = FakeMessage(user_id=1004)
     cb = FakeCallbackQuery(user_id=1004, data="inbox:open", message=fake_msg)
 
-    await inbox.on_inbox_open(cb, db_session)
+    await inbox.on_inbox_open(cb, db_session, settings)
 
     assert "Hozircha xabar yo'q" in fake_msg.last_text
 
@@ -101,7 +101,7 @@ async def test_inbox_open_lists_message_and_open_marks_read(db_session, clean_ta
 
     fake_msg = FakeMessage(user_id=1005)
     cb = FakeCallbackQuery(user_id=1005, data="inbox:open", message=fake_msg)
-    await inbox.on_inbox_open(cb, db_session)
+    await inbox.on_inbox_open(cb, db_session, settings)
     assert "Salom" not in fake_msg.last_text  # inbox shows previews via buttons, not inline body text
 
     open_cb = FakeCallbackQuery(user_id=1005, data=f"msg:open:{message_id}", message=fake_msg)
@@ -135,7 +135,7 @@ async def test_block_flow_prevents_future_sends(db_session, clean_tables, fake_r
     fake_msg = FakeMessage(user_id=1007)
 
     block_cb = FakeCallbackQuery(user_id=1007, data=f"msg:blockconfirm:{message_id}", message=fake_msg)
-    await inbox.on_block_confirm(block_cb, db_session)
+    await inbox.on_block_confirm(block_cb, db_session, settings)
 
     from sqlalchemy import select
     result = await db_session.execute(select(Block).where(Block.user_id == 1007))
@@ -156,7 +156,7 @@ async def test_delete_flow_clears_body(db_session, clean_tables, fake_redis):
     fake_msg = FakeMessage(user_id=1008)
 
     delete_cb = FakeCallbackQuery(user_id=1008, data=f"msg:deleteconfirm:{message_id}", message=fake_msg)
-    await inbox.on_delete_confirm(delete_cb, db_session)
+    await inbox.on_delete_confirm(delete_cb, db_session, settings)
 
     stored = await db_session.get(Message, message_id)
     assert stored.body == ""

@@ -1,5 +1,7 @@
 """Personal-link lifecycle: create, look up, regenerate/disable."""
 
+from urllib.parse import quote
+
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -132,3 +134,12 @@ async def auto_disable_link(session: AsyncSession, link: PublicLink) -> None:
 
 def build_sender_url(web_base_url: str, token: str) -> str:
     return f"{web_base_url.rstrip('/')}/s/{token}"
+
+
+def build_telegram_share_url(sender_url: str, share_text: str) -> str:
+    """Telegram's own share deep link — tapping it opens the client's native
+    forward/share picker with `share_text` + `sender_url` pre-filled; the
+    user still explicitly chooses who to send it to and taps send
+    themselves. `sender_url` must already be a real, generated sender URL
+    (see build_sender_url) — never a placeholder or altered value."""
+    return f"https://t.me/share/url?url={quote(sender_url, safe='')}&text={quote(share_text, safe='')}"

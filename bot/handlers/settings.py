@@ -1,7 +1,7 @@
 """Settings / Privacy / Safety / Help / link regeneration — screens 14-18."""
 
 from aiogram import F, Router
-from aiogram.types import CallbackQuery
+from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.analytics import track
@@ -18,6 +18,8 @@ from bot.keyboards import (
 )
 
 router = Router(name="settings")
+
+_SETTINGS_LABELS = {"⚙️ Sozlamalar", "⚙️ Настройки"}
 
 HELP_TEXT = {
     "uz": (
@@ -39,6 +41,13 @@ async def on_settings_open(callback: CallbackQuery, session: AsyncSession) -> No
     title = "⚙️ Sozlamalar" if user.lang == "uz" else "⚙️ Настройки"
     await callback.message.edit_text(title, reply_markup=settings_keyboard(user.lang))
     await callback.answer()
+
+
+@router.message(F.text.in_(_SETTINGS_LABELS))
+async def on_settings_open_reply_button(message: Message, session: AsyncSession) -> None:
+    user = await get_or_create_user(session, message.from_user.id)
+    title = "⚙️ Sozlamalar" if user.lang == "uz" else "⚙️ Настройки"
+    await message.answer(title, reply_markup=settings_keyboard(user.lang))
 
 
 @router.callback_query(F.data == "settings:privacy")

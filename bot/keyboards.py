@@ -1,10 +1,12 @@
-"""Inline keyboard builders for every bot screen."""
+"""Inline keyboard builders for every bot screen, plus the one persistent
+ReplyKeyboardMarkup (main_reply_keyboard)."""
 
-from aiogram.types import InlineKeyboardMarkup
+from aiogram.types import InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from core.copy import t
 from core.models import Message
+from core.services.links import build_telegram_share_url
 
 REPORT_REASONS = [
     ("harassment", {"uz": "Haqorat", "ru": "Оскорбление"}),
@@ -31,23 +33,36 @@ def welcome_keyboard(lang: str) -> InlineKeyboardMarkup:
 
 def link_ready_keyboard(lang: str, link_url: str) -> InlineKeyboardMarkup:
     b = InlineKeyboardBuilder()
-    b.button(text=t("share_cta", lang), callback_data="link:share")
+    # A `url=` button is the only way to trigger Telegram's own native
+    # share/forward picker client-side — it never fires a callback (a hard
+    # Bot API limitation), so link_shared analytics is tracked on the copy
+    # fallback below instead, which does.
+    b.button(text=t("share_cta", lang), url=build_telegram_share_url(link_url, t("share_message", lang)))
+    b.button(text=t("copy_link_cta", lang), callback_data="link:copy")
     b.button(text="📥 " + ("Qutim" if lang == "uz" else "Входящие"), callback_data="inbox:open")
     b.button(text="⚙️ " + ("Sozlamalar" if lang == "uz" else "Настройки"), callback_data="settings:open")
-    b.adjust(1, 2)
+    b.adjust(2, 2)
     return b.as_markup()
 
 
-def home_keyboard(lang: str) -> InlineKeyboardMarkup:
-    b = InlineKeyboardBuilder()
-    b.button(text="📥 " + ("Qutim" if lang == "uz" else "Входящие"), callback_data="inbox:open")
-    b.button(text="🔗 " + ("Havolam" if lang == "uz" else "Моя ссылка"), callback_data="link:show")
-    b.button(text="⚙️ " + ("Sozlamalar" if lang == "uz" else "Настройки"), callback_data="settings:open")
-    b.adjust(2, 1)
-    return b.as_markup()
+def main_reply_keyboard(lang: str) -> ReplyKeyboardMarkup:
+    """The 3 persistent main actions, shown below the chat input — replaces
+    the old inline "home" screen. Sent once (see bot/handlers/start.py); it
+    then stays attached to the chat across every future message/edit until
+    explicitly replaced, so it must not be resent on every navigation."""
+    inbox_label = "📥 Qutim" if lang == "uz" else "📥 Входящие"
+    link_label = "🔗 Havolam" if lang == "uz" else "🔗 Моя ссылка"
+    settings_label = "⚙️ Sozlamalar" if lang == "uz" else "⚙️ Настройки"
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text=inbox_label), KeyboardButton(text=link_label)],
+            [KeyboardButton(text=settings_label)],
+        ],
+        resize_keyboard=True,
+    )
 
 
-def inbox_keyboard(lang: str, messages: list[Message]) -> InlineKeyboardMarkup:
+def inbox_keyboard(lang: str, messages: list[Message], share_url: str | None = None) -> InlineKeyboardMarkup:
     b = InlineKeyboardBuilder()
     for m in messages:
         unread_marker = "🔵 " if m.opened_at is None else ""
@@ -55,7 +70,9 @@ def inbox_keyboard(lang: str, messages: list[Message]) -> InlineKeyboardMarkup:
         if len(m.body or "") > 40:
             preview += "…"
         b.button(text=f"{unread_marker}{preview or '···'}", callback_data=f"msg:open:{m.id}")
-    b.button(text=t("share_cta", lang), callback_data="link:share")
+    if share_url:
+        b.button(text=t("share_cta", lang), url=build_telegram_share_url(share_url, t("share_message", lang)))
+        b.button(text=t("copy_link_cta", lang), callback_data="link:copy")
     b.adjust(1)
     return b.as_markup()
 
@@ -67,7 +84,7 @@ def message_detail_keyboard(lang: str, message_id: int) -> InlineKeyboardMarkup:
     b.button(text=("🚫 Bloklash" if lang == "uz" else "🚫 Заблокировать"), callback_data=f"msg:block:{message_id}")
     b.button(text=("🖼 Karta sifatida" if lang == "uz" else "🖼 Как карточка"), callback_data=f"msg:card:{message_id}")
     b.button(text=t("welcome_cta", lang), callback_data="link:create")
-    b.button(text=("⬅️ Qutim" if lang == "uz" else "⬅️ Входящие"), callback_data="inbox:open")
+    b.button(text=t("back_button", lang), callback_data="inbox:open")
     b.adjust(2, 2, 1, 1)
     return b.as_markup()
 
@@ -84,7 +101,8 @@ def report_reason_keyboard(message_id: int, lang: str) -> InlineKeyboardMarkup:
     b = InlineKeyboardBuilder()
     for code, labels in REPORT_REASONS:
         b.button(text=labels.get(lang, labels["uz"]), callback_data=f"msg:reportreason:{message_id}:{code}")
-    b.adjust(2, 2, 1)
+    b.button(text=t("back_button", lang), callback_data=f"msg:open:{message_id}")
+    b.adjust(2, 2, 1, 1)
     return b.as_markup()
 
 
@@ -94,14 +112,14 @@ def settings_keyboard(lang: str) -> InlineKeyboardMarkup:
     b.button(text=("Xavfsizlik" if lang == "uz" else "Безопасность"), callback_data="settings:safety")
     b.button(text=("Yordam" if lang == "uz" else "Помощь"), callback_data="settings:help")
     b.button(text=("Havolani yangilash" if lang == "uz" else "Обновить ссылку"), callback_data="settings:regenerate")
-    b.button(text=("⬅️ Bosh sahifa" if lang == "uz" else "⬅️ Главная"), callback_data="home:open")
+    b.button(text=t("back_button", lang), callback_data="home:open")
     b.adjust(2, 2, 1)
     return b.as_markup()
 
 
 def back_to_settings_keyboard(lang: str) -> InlineKeyboardMarkup:
     b = InlineKeyboardBuilder()
-    b.button(text=("⬅️ Sozlamalar" if lang == "uz" else "⬅️ Настройки"), callback_data="settings:open")
+    b.button(text=t("back_button", lang), callback_data="settings:open")
     return b.as_markup()
 
 
@@ -111,7 +129,7 @@ def privacy_keyboard(lang: str, web_base_url: str) -> InlineKeyboardMarkup:
         text=("To'liq matn" if lang == "uz" else "Полный текст"),
         url=f"{web_base_url.rstrip('/')}/privacy?lang={lang}",
     )
-    b.button(text=("⬅️ Sozlamalar" if lang == "uz" else "⬅️ Настройки"), callback_data="settings:open")
+    b.button(text=t("back_button", lang), callback_data="settings:open")
     b.adjust(1)
     return b.as_markup()
 
