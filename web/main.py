@@ -38,7 +38,14 @@ _SECURITY_HEADERS = {
 
 def _trusted_hosts(settings) -> list[str]:
     hostname = urlparse(settings.web_base_url).hostname or "localhost"
-    hosts = [hostname]
+    # Trust the www-prefixed variant alongside whichever form WEB_BASE_URL
+    # itself uses — both shivir.online and www.shivir.online resolve to this
+    # server and are proxied identically (see infra/nginx.conf.example), but
+    # WEB_BASE_URL only ever names one of them.
+    if hostname.startswith("www."):
+        hosts = [hostname, hostname[len("www.") :]]
+    else:
+        hosts = [hostname, f"www.{hostname}"]
     if not settings.is_production:
         # Dev convenience + the ASGI test client's default host.
         hosts += ["testserver", "localhost", "127.0.0.1"]
