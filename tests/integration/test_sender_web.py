@@ -94,6 +94,28 @@ async def test_send_empty_message_is_rejected(client, db_session, clean_tables):
     assert resp.status_code == 422
 
 
+async def test_rate_limited_send_returns_429(client, db_session, clean_tables):
+    link = await _make_link(db_session, 2010)
+    page = await client.get(f"/s/{link.token}")
+    csrf = await _get_csrf_token(page.text)
+
+    original_limit = settings.rate_limit_send_per_fingerprint
+    settings.rate_limit_send_per_fingerprint = 1
+    try:
+        first = await client.post(
+            f"/s/{link.token}/send", json={"message": "salom", "csrf_token": csrf}
+        )
+        assert first.status_code == 200
+
+        second = await client.post(
+            f"/s/{link.token}/send", json={"message": "salom yana", "csrf_token": csrf}
+        )
+        assert second.status_code == 429
+        assert second.json()["status"] == "rate_limited"
+    finally:
+        settings.rate_limit_send_per_fingerprint = original_limit
+
+
 async def test_send_abusive_message_needs_warning_then_can_be_acknowledged(client, db_session, clean_tables):
     link = await _make_link(db_session, 2005)
     page = await client.get(f"/s/{link.token}")
