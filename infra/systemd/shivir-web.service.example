@@ -20,6 +20,8 @@ RestartSec=3
 # Sandboxing: no filesystem writes needed in production (templates/static are
 # read-only assets, DB is Postgres, cache is Redis, logs go to the journal).
 NoNewPrivileges=true
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true

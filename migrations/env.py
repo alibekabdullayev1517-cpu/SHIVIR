@@ -1,4 +1,5 @@
 import asyncio
+import os
 from logging.config import fileConfig
 
 from alembic import context
@@ -17,7 +18,15 @@ target_metadata = Base.metadata
 
 
 def get_url() -> str:
-    return get_settings().database_url
+    # Migrations run DDL (CREATE/ALTER/DROP) and need the schema-owning
+    # role. The app's own .env DATABASE_URL is intentionally the
+    # least-privilege runtime role (shivir_app), which cannot do DDL — so
+    # migrations must never silently inherit it. ALEMBIC_DATABASE_URL is a
+    # separate, explicit override (set in the shell, not .env) that always
+    # takes precedence; falling back to settings.database_url only applies
+    # when it's unset (e.g. before the least-privilege cutover, when the
+    # runtime URL still *is* the superuser).
+    return os.environ.get("ALEMBIC_DATABASE_URL") or get_settings().database_url
 
 
 def run_migrations_offline() -> None:

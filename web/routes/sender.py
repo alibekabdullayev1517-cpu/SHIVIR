@@ -158,7 +158,13 @@ async def sender_send(
 
     if result.status == SendStatus.RATE_LIMITED:
         await track("send_rate_limited", link_id=link.id, scope=result.rate_limit_scope)
-        return JSONResponse({"status": "rate_limited", "message": t("rate_limited", lang)})
+        # 429, not the implicit 200: the frontend keys off the JSON `status`
+        # field either way (see sender_landing.html), never response.status,
+        # so this doesn't change client behavior — it just makes the
+        # response semantically correct for any other consumer/monitoring.
+        return JSONResponse(
+            {"status": "rate_limited", "message": t("rate_limited", lang)}, status_code=429
+        )
 
     if result.status == SendStatus.NEEDS_WARNING:
         await track("abuse_warning_shown", link_id=link.id, trigger_category=result.warning_category)

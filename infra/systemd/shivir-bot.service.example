@@ -17,6 +17,8 @@ RestartSec=3
 # (DB is Postgres, cache is Redis, logs go to the journal). Safe to lock down
 # hard with no ReadWritePaths needed.
 NoNewPrivileges=true
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
