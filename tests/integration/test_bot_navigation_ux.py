@@ -11,7 +11,7 @@ from core.models import PublicLink, User
 from core.services.links import build_sender_url
 
 from bot.handlers import inbox, settings as settings_handlers, start
-from bot.keyboards import link_ready_keyboard, report_reason_keyboard
+from bot.keyboards import inbox_keyboard, link_ready_keyboard, message_detail_keyboard, report_reason_keyboard
 from tests.fakes import FakeCallbackQuery, FakeMessage
 
 settings = get_settings()
@@ -157,28 +157,33 @@ def test_link_ready_keyboard_never_fabricates_a_different_domain():
     assert parsed_query["url"] == ["https://shivir.online/s/realtoken123"]
 
 
-async def test_copy_link_fallback_tracks_analytics_and_shows_toast(db_session, clean_tables):
-    db_session.add(User(tg_user_id=3007, lang="uz"))
-    await db_session.commit()
-    from core.services.links import create_link as _create_link
+def test_link_ready_keyboard_has_no_copy_button():
+    """"📋 Linkni nusxalash" is removed entirely — only real native Ulashish
+    share remains."""
+    markup = link_ready_keyboard("uz", "https://shivir.online/s/realtoken123")
+    copy_btn = _inline_button(markup, callback_data="link:copy")
+    assert copy_btn is None
 
-    await _create_link(db_session, owner_user_id=3007)
 
-    fake_msg = FakeMessage(user_id=3007)
-    copy_cb = FakeCallbackQuery(user_id=3007, data="link:copy", message=fake_msg)
-    await start.on_link_copy(copy_cb, db_session)
+def test_link_ready_keyboard_has_no_qutim_or_sozlamalar_shortcuts():
+    """Qutim/Sozlamalar stay reachable only via the persistent reply
+    keyboard, not as redundant inline shortcuts on the link-ready screen."""
+    markup = link_ready_keyboard("uz", "https://shivir.online/s/realtoken123")
+    labels = {btn.text for row in markup.inline_keyboard for btn in row}
+    assert not any("Qutim" in label or "Sozlamalar" in label for label in labels)
 
-    assert copy_cb.answers[-1]["show_alert"] is True
-    assert copy_cb.answers[-1]["text"]
 
-    from sqlalchemy import select
+def test_inbox_keyboard_has_no_copy_button():
+    markup = inbox_keyboard("uz", [], share_url="https://shivir.online/s/realtoken123")
+    copy_btn = _inline_button(markup, callback_data="link:copy")
+    assert copy_btn is None
 
-    from core.models import Event
 
-    result = await db_session.execute(select(Event).where(Event.name == "link_shared"))
-    event = result.scalars().first()
-    assert event is not None
-    assert event.props["channel"] == "copy"
+def test_message_detail_keyboard_has_no_havola_yaratish_button():
+    """Link creation belongs to the My Link flow, not Inbox message actions."""
+    markup = message_detail_keyboard("uz", message_id=1)
+    create_btn = _inline_button(markup, callback_data="link:create")
+    assert create_btn is None
 
 
 # --- Tapping the 3 persistent reply-keyboard buttons directly --------------
@@ -233,19 +238,16 @@ async def test_reply_keyboard_buttons_work_in_russian_too(db_session, clean_tabl
 
 
 async def test_no_automatic_message_sent_by_share_flow(db_session, clean_tables):
-    """Tapping Ulashish/copy must never itself deliver a message anywhere —
-    only the user's own choice inside Telegram's native share UI does."""
+    """Ulashish is a `url=` button — Telegram opens its native share picker
+    entirely client-side and never calls back into the bot, so link-ready
+    rendering itself must never send/edit an extra message beyond the one
+    screen it's asked to render."""
     db_session.add(User(tg_user_id=3008, lang="uz"))
     await db_session.commit()
-    from core.services.links import create_link as _create_link
-
-    await _create_link(db_session, owner_user_id=3008)
 
     fake_msg = FakeMessage(user_id=3008)
-    copy_cb = FakeCallbackQuery(user_id=3008, data="link:copy", message=fake_msg)
-    await start.on_link_copy(copy_cb, db_session)
+    show_cb = FakeCallbackQuery(user_id=3008, data="link:show", message=fake_msg)
+    await start.on_link_show(show_cb, db_session, settings)
 
-    # on_link_copy only ever answers the callback (a toast) — it must never
-    # send or edit a message.
     assert fake_msg.sent == []
-    assert fake_msg.edited == []
+    assert len(fake_msg.edited) == 1

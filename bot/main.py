@@ -9,6 +9,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from redis.asyncio import Redis
 
+from cards.render import warm_up as warm_up_cards
 from core.config import get_settings
 
 from bot.error_handler import on_error
@@ -22,6 +23,13 @@ async def main() -> None:
         raise RuntimeError("BOT_TOKEN is not set — supply it via the environment (.env), never hardcode it.")
 
     logging.basicConfig(level=settings.log_level)
+
+    # Build the share card's cached static layer + fonts now, so the first
+    # "Karta sifatida" tap isn't slower than the rest. Best-effort only.
+    try:
+        await asyncio.to_thread(warm_up_cards)
+    except Exception:
+        logging.getLogger("shivir.bot").warning("Share-card warm-up failed; first card will build lazily", exc_info=True)
 
     bot = Bot(token=settings.bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dp = Dispatcher()

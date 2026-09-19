@@ -1,50 +1,87 @@
 {% extends "base.html" %}
+{% block title %}{% if display_name %}{{ display_name }} — {% endif %}Shivir{% endblock %}
 {% block content %}
 <div id="composeView">
-  <p class="reassurance">
+
+  <section class="recipient enter" style="--i:1" aria-labelledby="recipientName">
     {% if display_name %}
-      <strong>{{ display_name }}</strong> — {{ copy.reassurance }}
+    <h1 class="recipient__name" id="recipientName">{{ display_name }}</h1>
+    <p class="recipient__hint">{{ copy.hint }}</p>
     {% else %}
-      {{ copy.reassurance }}
+    <h1 class="recipient__name" id="recipientName">{{ copy.hint }}</h1>
     {% endif %}
-  </p>
+  </section>
 
-  <textarea id="composer" maxlength="{{ max_length }}" placeholder="{{ copy.placeholder }}" autofocus></textarea>
-  <div class="counter-row" id="counterRow">0 / {{ max_length }}</div>
+  <div class="composer enter" style="--i:2">
+    <label class="sr-only" for="composer">{{ copy.compose_label }}</label>
+    <textarea id="composer" maxlength="{{ max_length }}" rows="4" spellcheck="false"
+              placeholder="{{ copy.placeholder }}" aria-describedby="composerLimit"></textarea>
+    <span class="sr-only" id="composerLimit">{{ copy.chars_max_hint }}</span>
 
-  <div class="prompts">
+    <div class="composer__foot">
+      <div class="counter" id="counterRow" data-level="ok" aria-hidden="true">
+        <svg class="counter__ring" width="20" height="20" viewBox="0 0 20 20">
+          <circle class="counter__track" cx="10" cy="10" r="8"/>
+          <circle class="counter__bar" id="counterBar" cx="10" cy="10" r="8"/>
+        </svg>
+        <span><span id="counterNum">0</span> / {{ max_length }}</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="starters enter" style="--i:3" id="starters" role="group" aria-label="{{ copy.prompts_label }}">
     {% for prompt in prompts %}
-    <button type="button" class="prompt-chip" data-prompt="{{ prompt }}">{{ prompt }}</button>
+    <button type="button" class="prompt-chip" data-id="{{ prompt.id }}" data-prompt="{{ prompt.text }}">{{ prompt.text }}</button>
     {% endfor %}
   </div>
 
-  <button type="button" class="primary" id="sendButton" disabled>{{ copy.send_cta }}</button>
-  <p style="text-align:center;margin-top:16px;">
-    <a href="/privacy?lang={{ lang }}" style="color:var(--color-muted);font-size:12px;text-decoration:underline;">
-      {{ "Maxfiylik siyosati" if lang == "uz" else "Политика конфиденциальности" }}
-    </a>
+  <div class="actions enter" style="--i:4">
+    <button type="button" class="primary" id="sendButton" data-state="idle" disabled>
+      <span class="btn__face btn__face--idle">{{ copy.send_cta }}</span>
+      <span class="btn__face btn__face--busy">
+        <svg class="btn__spinner" width="18" height="18" viewBox="0 0 20 20" aria-hidden="true">
+          <circle class="track" cx="10" cy="10" r="8"/>
+          <circle class="arc" cx="10" cy="10" r="8"/>
+        </svg>
+        {{ copy.sending }}
+      </span>
+    </button>
+  </div>
+
+  <p class="assurance enter" style="--i:5">
+    <span class="assurance__line">
+      <svg class="assurance__icon" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <rect x="3" y="7" width="10" height="7" rx="2" stroke="currentColor" stroke-width="1.5"/>
+        <path d="M5.5 7V5.25a2.5 2.5 0 0 1 5 0V7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      {{ copy.assurance }}
+    </span>
+    <a class="link" href="/privacy?lang={{ lang }}">{{ copy.privacy_link }}</a>
   </p>
+
+  <p class="sr-only" id="srStatus" aria-live="polite"></p>
 </div>
 
-<div id="sendingView" class="state-overlay" hidden>
-  <div class="spinner"></div>
+<div id="successView" class="state-overlay state-overlay--success" role="status" hidden>
+  <div class="success__icon" aria-hidden="true">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+      <path d="M5.5 12.5l4.2 4.2 8.8-9.4" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
+  <div class="success__copy">
+    <p class="success__title">{{ copy.sent_title }}</p>
+    <p class="success__note">{{ copy.sent_reassurance }}</p>
+  </div>
+  <a class="success__cta" href="https://t.me/{{ bot_username }}">{{ copy.success_secondary_cta }}</a>
 </div>
 
-<div id="successView" class="state-overlay" hidden>
-  <div class="icon-badge success">✓</div>
-  <div class="state-title">{{ copy.success }}</div>
-  <button type="button" class="secondary" onclick="window.location.href='https://t.me/{{ bot_username }}'">
-    {{ copy.success_secondary_cta }}
-  </button>
-</div>
-
-<div id="rateLimitedView" class="state-overlay" hidden>
-  <div class="icon-badge warning">⏳</div>
+<div id="rateLimitedView" class="state-overlay" role="status" hidden>
+  <div class="icon-badge warning" aria-hidden="true">⏳</div>
   <div class="state-title">{{ copy.rate_limited }}</div>
 </div>
 
-<div id="warningView" class="state-overlay" hidden>
-  <div class="icon-badge warning">!</div>
+<div id="warningView" class="state-overlay" role="alert" hidden>
+  <div class="icon-badge warning" aria-hidden="true">!</div>
   <div class="state-title">{{ copy.abuse_prompt }}</div>
   <div class="button-row">
     <button type="button" class="secondary" id="warningEditBtn">{{ copy.abuse_edit }}</button>
@@ -52,25 +89,33 @@
   </div>
 </div>
 
-<div id="errorView" class="state-overlay" hidden>
-  <div class="icon-badge error">!</div>
+<div id="errorView" class="state-overlay" role="alert" hidden>
+  <div class="icon-badge error" aria-hidden="true">!</div>
   <div class="state-title">{{ copy.generic_error }}</div>
   <button type="button" class="secondary" id="errorRetryBtn">{{ copy.send_cta }}</button>
 </div>
 
+<script type="application/json" id="promptPool">{{ prompt_pool | tojson }}</script>
 <script>
 (function () {
   const token = {{ token | tojson }};
   const csrfToken = {{ csrf_token | tojson }};
   const maxLength = {{ max_length }};
+  const i18n = {
+    charsLeft: {{ copy.chars_left | tojson }},
+    limitReached: {{ copy.chars_limit_reached | tojson }},
+  };
 
   const composer = document.getElementById("composer");
   const counterRow = document.getElementById("counterRow");
+  const counterNum = document.getElementById("counterNum");
+  const counterBar = document.getElementById("counterBar");
   const sendButton = document.getElementById("sendButton");
+  const srStatus = document.getElementById("srStatus");
+  const starters = document.getElementById("starters");
 
   const views = {
     compose: document.getElementById("composeView"),
-    sending: document.getElementById("sendingView"),
     success: document.getElementById("successView"),
     rateLimited: document.getElementById("rateLimitedView"),
     warning: document.getElementById("warningView"),
@@ -83,6 +128,46 @@
     }
   }
 
+  /* ---- Suggested prompts: always exactly 3, never the same 3 as last visit.
+     The server already picked 3 from different categories; if any of them
+     was shown on this device's previous visit, re-pick from the pool here.
+     The last-shown ids live only in this browser's localStorage — never sent
+     anywhere, no cookie. ---------------------------------------------------- */
+  const PROMPT_KEY = "shivir:prompts";
+  const chips = Array.from(starters.querySelectorAll(".prompt-chip"));
+
+  function safeRead() {
+    try { return JSON.parse(localStorage.getItem(PROMPT_KEY)) || []; } catch (e) { return []; }
+  }
+  function safeWrite(ids) {
+    try { localStorage.setItem(PROMPT_KEY, JSON.stringify(ids)); } catch (e) { /* storage unavailable: fine */ }
+  }
+
+  function rotatePrompts() {
+    const last = safeRead();
+    const shown = chips.map((c) => c.dataset.id);
+    if (shown.some((id) => last.includes(id))) {
+      let pool = [];
+      try { pool = JSON.parse(document.getElementById("promptPool").textContent); } catch (e) { /* keep server picks */ }
+      const fresh = pool.filter((row) => !last.includes(row[0]));
+      const byCat = {};
+      fresh.forEach((row) => { (byCat[row[1]] = byCat[row[1]] || []).push(row); });
+      const cats = Object.keys(byCat).sort(() => Math.random() - 0.5).slice(0, chips.length);
+      if (cats.length === chips.length) {
+        cats.forEach((cat, i) => {
+          const rows = byCat[cat];
+          const row = rows[Math.floor(Math.random() * rows.length)];
+          chips[i].dataset.id = row[0];
+          chips[i].dataset.prompt = row[2];
+          chips[i].textContent = row[2];
+        });
+      }
+    }
+    safeWrite(chips.map((c) => c.dataset.id));
+  }
+  rotatePrompts();
+
+  /* ---- Analytics beacon (unchanged) -------------------------------------- */
   let startedTracked = false;
   function trackMessageStarted() {
     if (startedTracked) return;
@@ -95,29 +180,78 @@
     }).catch(() => {});
   }
 
+  /* ---- Counter ------------------------------------------------------------ */
+  const RING = 2 * Math.PI * 8;
+  counterBar.style.strokeDasharray = RING;
+  let lastBucket = null;
+  let sending = false;
+
+  function announce(msg) { srStatus.textContent = ""; srStatus.textContent = msg; }
+
   function updateCounter() {
     const len = composer.value.length;
-    counterRow.textContent = `${len} / ${maxLength}`;
-    counterRow.classList.toggle("over-limit", len > maxLength);
-    sendButton.disabled = len === 0 || len > maxLength;
+    const ratio = Math.min(len / maxLength, 1);
+    counterNum.textContent = len;
+    counterBar.style.strokeDashoffset = RING * (1 - ratio);
+    counterRow.dataset.level = len >= maxLength ? "max" : ratio >= 0.9 ? "warn" : "ok";
+    sendButton.disabled = sending || composer.value.trim().length === 0 || len > maxLength;
+
+    // Screen readers hear threshold changes only, not every keystroke.
+    const left = maxLength - len;
+    const bucket = left <= 0 ? 0 : left <= 10 ? 10 : left <= 20 ? 20 : null;
+    if (bucket !== lastBucket) {
+      lastBucket = bucket;
+      if (bucket === 0) announce(i18n.limitReached);
+      else if (bucket !== null) announce(i18n.charsLeft.replace("{n}", left));
+    }
   }
+
+  function autosize() {
+    composer.style.height = "auto";
+    composer.style.height = composer.scrollHeight + "px";   // CSS max-height clamps; overflow scrolls
+  }
+
+  function sync() { autosize(); updateCounter(); }
 
   composer.addEventListener("input", () => {
     trackMessageStarted();
-    updateCounter();
+    chips.forEach((c) => c.removeAttribute("aria-pressed"));
+    sync();
   });
+  window.addEventListener("resize", autosize);
 
-  document.querySelectorAll(".prompt-chip").forEach((chip) => {
+  /* ---- Prompt chips: insert the text, keep typing (existing behaviour) ---- */
+  chips.forEach((chip) => {
     chip.addEventListener("click", () => {
-      composer.value = chip.dataset.prompt + " ";
+      if (sending) return;
+      composer.value = (chip.dataset.prompt + " ").slice(0, maxLength);
+      chips.forEach((c) => c.removeAttribute("aria-pressed"));
+      chip.setAttribute("aria-pressed", "true");
       composer.focus();
+      composer.setSelectionRange(composer.value.length, composer.value.length);
       trackMessageStarted();
-      updateCounter();
+      sync();
+      chip.classList.remove("is-picked");
+      void chip.offsetWidth;                 // restart the blip
+      chip.classList.add("is-picked");
     });
   });
 
+  /* ---- Send ---------------------------------------------------------------- */
+  function setSending(on) {
+    sending = on;
+    sendButton.dataset.state = on ? "loading" : "idle";
+    sendButton.setAttribute("aria-busy", String(on));
+    composer.readOnly = on;
+    chips.forEach((c) => { c.disabled = on; });
+    updateCounter();
+  }
+
   async function submit(acknowledgeWarning) {
-    showView("sending");
+    // The loading state lives on the button for exactly as long as the
+    // request is pending; the composer stays in place.
+    showView("compose");
+    setSending(true);
     try {
       const response = await fetch(`/s/${token}/send`, {
         method: "POST",
@@ -129,6 +263,7 @@
         }),
       });
       const data = await response.json();
+      setSending(false);
 
       if (data.status === "success") {
         showView("success");
@@ -140,6 +275,7 @@
         showView("error");
       }
     } catch (err) {
+      setSending(false);
       showView("error");
     }
   }
@@ -153,7 +289,7 @@
   document.getElementById("warningContinueBtn").addEventListener("click", () => submit(true));
   document.getElementById("errorRetryBtn").addEventListener("click", () => showView("compose"));
 
-  updateCounter();
+  sync();
 })();
 </script>
 {% endblock %}

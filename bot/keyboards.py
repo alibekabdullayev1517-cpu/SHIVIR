@@ -35,13 +35,10 @@ def link_ready_keyboard(lang: str, link_url: str) -> InlineKeyboardMarkup:
     b = InlineKeyboardBuilder()
     # A `url=` button is the only way to trigger Telegram's own native
     # share/forward picker client-side — it never fires a callback (a hard
-    # Bot API limitation), so link_shared analytics is tracked on the copy
-    # fallback below instead, which does.
+    # Bot API limitation), so link_shared analytics cannot be tracked from
+    # this button.
     b.button(text=t("share_cta", lang), url=build_telegram_share_url(link_url, t("share_message", lang)))
-    b.button(text=t("copy_link_cta", lang), callback_data="link:copy")
-    b.button(text="📥 " + ("Qutim" if lang == "uz" else "Входящие"), callback_data="inbox:open")
-    b.button(text="⚙️ " + ("Sozlamalar" if lang == "uz" else "Настройки"), callback_data="settings:open")
-    b.adjust(2, 2)
+    b.adjust(1)
     return b.as_markup()
 
 
@@ -72,7 +69,6 @@ def inbox_keyboard(lang: str, messages: list[Message], share_url: str | None = N
         b.button(text=f"{unread_marker}{preview or '···'}", callback_data=f"msg:open:{m.id}")
     if share_url:
         b.button(text=t("share_cta", lang), url=build_telegram_share_url(share_url, t("share_message", lang)))
-        b.button(text=t("copy_link_cta", lang), callback_data="link:copy")
     b.adjust(1)
     return b.as_markup()
 
@@ -83,9 +79,8 @@ def message_detail_keyboard(lang: str, message_id: int) -> InlineKeyboardMarkup:
     b.button(text=("🚩 Shikoyat" if lang == "uz" else "🚩 Жалоба"), callback_data=f"msg:report:{message_id}")
     b.button(text=("🚫 Bloklash" if lang == "uz" else "🚫 Заблокировать"), callback_data=f"msg:block:{message_id}")
     b.button(text=("🖼 Karta sifatida" if lang == "uz" else "🖼 Как карточка"), callback_data=f"msg:card:{message_id}")
-    b.button(text=t("welcome_cta", lang), callback_data="link:create")
     b.button(text=t("back_button", lang), callback_data="inbox:open")
-    b.adjust(2, 2, 1, 1)
+    b.adjust(2, 2, 1)
     return b.as_markup()
 
 

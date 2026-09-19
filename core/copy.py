@@ -44,12 +44,36 @@ COPY: dict[str, dict[str, str]] = {
         "uz": "Bu odamga anonim xabar yuboring. Ular kim yozganini bilishmaydi.",
         "ru": "Отправьте анонимное сообщение этому человеку. Они не узнают, кто вы.",
     },
+    "sender_hint": {
+        "uz": "Bu odamga anonim xabar yuboring.",
+        "ru": "Отправьте анонимное сообщение этому человеку.",
+    },
+    "sender_assurance": {
+        "uz": "Ular kim yozganini bilishmaydi.",
+        "ru": "Они не узнают, кто вы.",
+    },
+    "compose_label": {"uz": "Anonim xabaringiz", "ru": "Ваше анонимное сообщение"},
+    "prompts_label": {
+        "uz": "Xabarni boshlash uchun takliflar",
+        "ru": "Подсказки, с чего начать",
+    },
+    "sending_label": {"uz": "Yuborilmoqda…", "ru": "Отправка…"},
+    "sent_label": {"uz": "Yuborildi", "ru": "Отправлено"},
+    "chars_max_hint": {"uz": "Ko‘pi bilan {n} ta belgi.", "ru": "Не более {n} символов."},
+    "chars_left": {"uz": "{n} ta belgi qoldi.", "ru": "Осталось символов: {n}."},
+    "chars_limit_reached": {
+        "uz": "Belgilar chegarasiga yetdingiz.",
+        "ru": "Достигнут предел символов.",
+    },
+    "privacy_link": {"uz": "Maxfiylik siyosati", "ru": "Политика конфиденциальности"},
     "compose_placeholder": {"uz": "Xabaringizni yozing...", "ru": "Напишите сообщение..."},
     "send_cta": {"uz": "Yuborish", "ru": "Отправить"},
     "send_success": {
         "uz": "Xabaringiz yuborildi ✅ Anonimligingiz saqlanadi.",
         "ru": "Сообщение отправлено ✅ Ваша анонимность сохранена.",
     },
+    "sent_title": {"uz": "Xabaringiz yuborildi", "ru": "Сообщение отправлено"},
+    "sent_reassurance": {"uz": "Anonimligingiz saqlanadi.", "ru": "Ваша анонимность сохранена."},
     "send_success_secondary_cta": {
         "uz": "O'zingizning Shivir havolangizni yarating",
         "ru": "Создайте свою ссылку Shivir",
@@ -79,12 +103,7 @@ COPY: dict[str, dict[str, str]] = {
         "ru": "Отправь мне анонимное сообщение 👀",
     },
     "main_menu_ready": {"uz": "Asosiy menyu tayyor 👇", "ru": "Главное меню готово 👇"},
-    "copy_link_toast": {
-        "uz": "Havolani nusxalash uchun yuqoridagi matnni bosing",
-        "ru": "Нажмите на ссылку выше, чтобы скопировать её",
-    },
     "back_button": {"uz": "◀️ Orqaga", "ru": "◀️ Назад"},
-    "copy_link_cta": {"uz": "📋 Linkni nusxalash", "ru": "📋 Скопировать ссылку"},
 }
 
 

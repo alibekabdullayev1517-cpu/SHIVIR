@@ -1,12 +1,14 @@
 """Inbox, message detail, delete/report/block, and share-as-card."""
 
+import asyncio
+import logging
 from datetime import datetime, timezone
 
 from aiogram import F, Router
 from aiogram.types import BufferedInputFile, CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from cards.render import render_variant_a
+from cards.render import render_share_card
 from core.analytics import track
 from core.config import Settings
 from core.copy import t
@@ -28,6 +30,7 @@ from bot.keyboards import (
 )
 
 router = Router(name="inbox")
+logger = logging.getLogger("shivir.bot.inbox")
 
 _INBOX_LABELS = {"📥 Qutim", "📥 Входящие"}
 
@@ -174,26 +177,32 @@ async def on_report_reason(callback: CallbackQuery, session: AsyncSession, setti
 
 @router.callback_query(F.data.startswith("msg:card:"))
 async def on_share_card(callback: CallbackQuery, session: AsyncSession, settings: Settings) -> None:
-    message_id = int(callback.data.split(":")[2])
     tg_user_id = callback.from_user.id
     user = await get_or_create_user(session, tg_user_id)
 
+    try:
+        message_id = int(callback.data.split(":")[2])
+    except (IndexError, ValueError):
+        await callback.answer(t("generic_error", user.lang), show_alert=True)
+        return
+
+    # Authorisation: only the recipient's own, non-deleted message is ever loaded.
     message = await get_message_for_recipient(session, message_id, tg_user_id)
     if message is None:
         await callback.answer(t("generic_error", user.lang), show_alert=True)
         return
 
-    link = await get_active_link_for_owner(session, tg_user_id)
-    cta_link = build_sender_url(settings.web_base_url, link.token) if link else settings.web_base_url
-
-    png_bytes = render_variant_a(message.body, cta_link)
-    caption = (
-        "Kartani Instagram yoki Telegram'da ulashing!"
-        if user.lang == "uz"
-        else "Поделитесь карточкой в Instagram или Telegram!"
-    )
-    await callback.message.answer_photo(
-        BufferedInputFile(png_bytes, filename="shivir-card.png"), caption=caption
-    )
-    await track("share_card_generated", user_id=tg_user_id, message_id=message_id)
+    # End Telegram's loading spinner right away; rendering follows.
     await callback.answer()
+
+    try:
+        # Pure-CPU Pillow work: keep it off the event loop so other updates aren't stalled.
+        png_bytes = await asyncio.to_thread(render_share_card, message.body)
+        # No caption: the message is already in the image, and nothing else belongs with it.
+        await callback.message.answer_photo(BufferedInputFile(png_bytes, filename="shivir-card.png"))
+    except Exception:
+        # Log the cause server-side (never the message text); show only plain copy.
+        logger.exception("Share card failed for message_id=%s", message_id)
+        await callback.message.answer(t("generic_error", user.lang))
+        return
+    await track("share_card_generated", user_id=tg_user_id, message_id=message_id)

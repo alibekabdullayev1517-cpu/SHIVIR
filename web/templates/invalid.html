@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="state-overlay">
-  <div class="icon-badge error">!</div>
+<div class="state-overlay enter" style="--i:1" role="alert">
+  <div class="icon-badge error" aria-hidden="true">!</div>
   <div class="state-title">{{ message }}</div>
 </div>
 {% endblock %}

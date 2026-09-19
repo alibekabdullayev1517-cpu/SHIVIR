@@ -6,8 +6,11 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
+from web import assets
+
 router = APIRouter()
 templates = Jinja2Templates(directory="web/templates")
+assets.register(templates)
 
 PARAGRAPHS = {
     "uz": [
@@ -46,11 +49,26 @@ PARAGRAPHS = {
 TITLES = {"uz": "Maxfiylik siyosati", "ru": "Политика конфиденциальности"}
 
 
+def _structure(paragraphs: list[str]) -> list[dict]:
+    """Presentation only — the wording above is untouched. First paragraph is
+    the lead, last is the closing callout, and a short "Label:" opener
+    ("Biz nimalarni saqlaymiz:") is split out so it can be set in bold."""
+    blocks = []
+    for i, text in enumerate(paragraphs):
+        kind = "lead" if i == 0 else "note" if i == len(paragraphs) - 1 else "body"
+        head, sep, rest = text.partition(":")
+        if kind == "body" and sep and len(head) <= 40:
+            blocks.append({"kind": kind, "lead_in": head + ":", "text": rest.strip()})
+        else:
+            blocks.append({"kind": kind, "lead_in": None, "text": text})
+    return blocks
+
+
 @router.get("/privacy", response_class=HTMLResponse)
 async def privacy_policy(request: Request, lang: str = "uz") -> HTMLResponse:
     lang = lang if lang in PARAGRAPHS else "uz"
     return templates.TemplateResponse(
         request,
         "privacy.html",
-        {"lang": lang, "title": TITLES[lang], "paragraphs": PARAGRAPHS[lang]},
+        {"lang": lang, "title": TITLES[lang], "blocks": _structure(PARAGRAPHS[lang])},
     )

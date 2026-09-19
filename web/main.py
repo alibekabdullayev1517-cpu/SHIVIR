@@ -14,10 +14,12 @@ from redis.asyncio import Redis
 from core.config import get_settings
 from core.copy import t
 
+from web import assets
 from web.routes import health, legal, sender
 
 logger = logging.getLogger("shivir.web")
 _error_templates = Jinja2Templates(directory="web/templates")
+assets.register(_error_templates)
 
 _SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",

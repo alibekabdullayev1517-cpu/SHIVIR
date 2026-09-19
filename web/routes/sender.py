@@ -3,8 +3,6 @@ field must be visible immediately, no separate 'start' tap), send, and the
 JSON API the page's own JS calls for send / message_started tracking.
 """
 
-import random
-
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
@@ -20,24 +18,17 @@ from core.models import User
 from core.security import compute_fingerprint, generate_csrf_token, verify_csrf_token
 from core.services.links import get_link_by_token
 from core.services.messages import MAX_MESSAGE_LENGTH, SendStatus, send_message
+from web import assets
+from web.prompts import pick_prompts, pool_payload
 
 router = APIRouter()
 templates = Jinja2Templates(directory="web/templates")
+assets.register(templates)
 
-PROMPTS = {
-    "uz": [
-        "Sen haqingda...",
-        "Eng yaxshi xotiram sen bilan...",
-        "Aytolmagan bir gapim bor...",
-        "Seni birinchi marta ko'rganimda...",
-    ],
-    "ru": [
-        "О тебе...",
-        "Лучшее воспоминание с тобой...",
-        "Есть кое-что, что я не решался сказать...",
-        "Когда я увидел тебя впервые...",
-    ],
-}
+# The redesigned sender page is built for short notes. This is a presentation
+# cap only (textarea maxlength + counter); the server-side limit in
+# core.services.messages is unchanged and remains the authority.
+SENDER_UI_MAX_LENGTH = min(200, MAX_MESSAGE_LENGTH)
 
 
 def get_redis(request: Request) -> Redis:
@@ -81,7 +72,6 @@ async def sender_landing(
     display_name = (owner.settings or {}).get("display_name") if owner else None
 
     csrf_token = generate_csrf_token(settings.secret_key, context=token)
-    prompts = random.sample(PROMPTS.get(lang, PROMPTS["uz"]), k=min(3, len(PROMPTS.get(lang, PROMPTS["uz"]))))
 
     await track("sender_page_viewed", link_id=link.id)
 
@@ -93,13 +83,25 @@ async def sender_landing(
             "display_name": display_name,
             "token": token,
             "csrf_token": csrf_token,
-            "prompts": prompts,
-            "max_length": MAX_MESSAGE_LENGTH,
+            "prompts": pick_prompts(lang),
+            "prompt_pool": pool_payload(lang),
+            "max_length": SENDER_UI_MAX_LENGTH,
             "copy": {
-                "reassurance": t("sender_reassurance", lang),
+                "hint": t("sender_hint", lang),
+                "assurance": t("sender_assurance", lang),
+                "compose_label": t("compose_label", lang),
+                "prompts_label": t("prompts_label", lang),
+                "sending": t("sending_label", lang),
+                "sent": t("sent_label", lang),
+                "chars_max_hint": t("chars_max_hint", lang).format(n=SENDER_UI_MAX_LENGTH),
+                "chars_left": t("chars_left", lang),
+                "chars_limit_reached": t("chars_limit_reached", lang),
+                "privacy_link": t("privacy_link", lang),
                 "placeholder": t("compose_placeholder", lang),
                 "send_cta": t("send_cta", lang),
                 "success": t("send_success", lang),
+                "sent_title": t("sent_title", lang),
+                "sent_reassurance": t("sent_reassurance", lang),
                 "success_secondary_cta": t("send_success_secondary_cta", lang),
                 "rate_limited": t("rate_limited", lang),
                 "generic_error": t("generic_error", lang),

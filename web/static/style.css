@@ -1,155 +1,600 @@
-/* Design tokens per docs/SHIVIR-master-plan.md's FINAL DESIGN TOKENS.
-   Font is the system stack, not Inter/Manrope — that recommendation is
-   explicitly marked "to validate," and the sender page's #1 priority is
-   fastest possible load on slow mobile networks, which a webfont request
-   works against. */
+/* Self-hosted Inter (variable) from /static/fonts — no third-party font
+   requests, so a visitor's IP never reaches a font CDN (and the CSP stays
+   `default-src 'self'`). */
+@font-face {
+  font-family: "Inter Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("fonts/inter-cyrillic-wght-normal.woff2") format("woff2-variations");
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: "Inter Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("fonts/inter-latin-ext-wght-normal.woff2") format("woff2-variations");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "Inter Variable";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("fonts/inter-latin-wght-normal.woff2") format("woff2-variations");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* ==========================================================================
+   SHIVIR — Arctic Cyan design system
+   One stylesheet for every web page (sender, privacy, invalid link).
+   Sections: 1 Tokens · 2 Base · 3 Layout · 4 Brand · 5 Recipient · 6 Composer
+             7 Starters · 8 Buttons · 9 Assurance · 10 Reading panel
+             11 State views · 12 Motion · 13 Utilities
+   ========================================================================== */
+
+
+/* 1. TOKENS ================================================================ */
 
 :root {
-  --color-primary: #5b4fe8;
-  --color-accent: #2dd4bf;
-  --color-text: #151521;
-  --color-muted: #8a8a99;
-  --color-surface: #f7f7fb;
-  --color-card: #ffffff;
-  --color-error: #ef4444;
-  --color-success: #22c55e;
-  --radius-card: 16px;
-  --radius-button: 12px;
-  --radius-input: 10px;
-  color-scheme: light;
+  color-scheme: dark;
+
+  /* Brand palette (raw) */
+  --cyan-500: #06b6d4;   /* primary   */
+  --cyan-300: #67e8f9;   /* secondary */
+  --cyan-200: #a5f3fc;   /* accent    */
+  --cyan-50:  #e0f7ff;   /* light     */
+  --ink-950:  #06141a;   /* background */
+  --ink-900:  #0a2028;   /* secondary surface */
+  --slate-50: #f8fafc;   /* text */
+  --slate-400:#94a3b8;   /* muted text */
+
+  /* Semantic colour */
+  --bg:               var(--ink-950);
+  --surface:          var(--ink-900);
+  --text:             var(--slate-50);
+  --text-soft:        rgba(248, 250, 252, 0.80);
+  --text-muted:       var(--slate-400);
+  --text-placeholder: #8395ab;            /* 5.5:1 on the composer surface */
+  --link:             var(--cyan-300);
+  --on-accent:        #04212b;            /* dark ink on cyan: 7:1 */
+  --warn:             #fbbf24;
+  --danger:           #fb7185;
+
+  --border:           rgba(103, 232, 249, 0.14);
+  --border-hover:     rgba(103, 232, 249, 0.30);
+  --border-focus:     rgba(103, 232, 249, 0.55);
+
+  --gradient-brand:   linear-gradient(135deg, #06b6d4 0%, #67e8f9 100%);
+
+  /* Glass surfaces */
+  --glass:            linear-gradient(180deg, rgba(103, 232, 249, 0.055), rgba(103, 232, 249, 0.02));
+  --glass-focus:      linear-gradient(180deg, rgba(103, 232, 249, 0.08), rgba(103, 232, 249, 0.03));
+  --glass-chip:       rgba(103, 232, 249, 0.045);
+  --glass-chip-hover: rgba(103, 232, 249, 0.10);
+  --glass-solid:      rgba(10, 32, 40, 0.86);   /* fallback without backdrop-filter */
+  --blur:             16px;
+
+  /* Spacing (4px base) */
+  --space-1: 4px;   --space-2: 8px;   --space-3: 12px;  --space-4: 16px;
+  --space-5: 20px;  --space-6: 24px;  --space-7: 32px;  --space-8: 40px;
+  --space-9: 48px;  --space-10: 64px;
+
+  /* Radius */
+  --radius-sm: 10px;  --radius-md: 16px;  --radius-lg: 22px;
+  --radius-xl: 28px;  --radius-pill: 999px;
+
+  /* Shadow */
+  --shadow-glass: inset 0 1px 0 rgba(224, 247, 255, 0.05), 0 16px 40px -20px rgba(0, 0, 0, 0.65);
+  --shadow-focus: 0 0 0 3px rgba(6, 182, 212, 0.12), 0 14px 34px -24px rgba(6, 182, 212, 0.30);
+  --shadow-cta:   inset 0 1px 0 rgba(255, 255, 255, 0.32), 0 10px 26px -12px rgba(6, 182, 212, 0.60);
+
+  /* Type */
+  --font-sans: "Inter Variable", "Inter", ui-sans-serif, system-ui, -apple-system,
+               "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --text-xs:   0.75rem;
+  --text-sm:   0.8125rem;
+  --text-base: 1rem;
+  --text-md:   1.0625rem;
+  --text-lg:   1.125rem;
+  --text-title: clamp(1.75rem, 1.35rem + 1.8vw, 2.25rem);   /* recipient + page titles */
+
+  /* Layout */
+  --col-sender:  30rem;    /* 480px — sender column */
+  --col-reading: 40rem;    /* 640px — privacy panel */
+  --logo-h:      40px;     /* logo mark height; wordmark scales with it */
+  --control-h:   56px;
+  --hit:         44px;     /* minimum touch target */
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.22, 0.8, 0.24, 1);
+  --dur-1: 120ms;
+  --dur-2: 200ms;
+  --dur-3: 420ms;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-text: #f5f5fa;
-    --color-muted: #9a9aab;
-    --color-surface: #0e0e14;
-    --color-card: #1b1b26;
-    color-scheme: dark;
-  }
+@media (min-width: 768px) {
+  :root { --logo-h: 48px; }
 }
 
-* {
-  box-sizing: border-box;
+
+/* 2. BASE ================================================================== */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  background: var(--bg);
 }
 
-html,
 body {
   margin: 0;
-  padding: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: 1.5;
+  font-optical-sizing: auto;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
-body {
-  background: var(--color-surface);
-  color: var(--color-text);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  font-size: 16px;
-  line-height: 1.45;
-  -webkit-text-size-adjust: 100%;
+/* Ambient light: one quiet cyan wash from the top, nothing else. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(72% 46% at 50% -10%, rgba(6, 182, 212, 0.17), transparent 70%),
+    radial-gradient(48% 34% at 100% 100%, rgba(103, 232, 249, 0.055), transparent 70%),
+    var(--bg);
 }
+
+h1, h2, p { margin: 0; }
+
+button, textarea { font: inherit; color: inherit; }
+
+::selection { background: rgba(103, 232, 249, 0.28); color: var(--text); }
+
+:focus-visible {
+  outline: 2px solid var(--cyan-300);
+  outline-offset: 3px;
+}
+
+
+/* 3. LAYOUT ================================================================ */
 
 .page {
-  max-width: 480px;
-  margin: 0 auto;
-  padding: 24px 16px 40px;
+  min-height: 100vh;
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
+  align-items: center;
+  padding-top:    calc(var(--space-6) + env(safe-area-inset-top, 0px));
+  padding-bottom: calc(var(--space-8) + env(safe-area-inset-bottom, 0px));
+  padding-left:   max(var(--space-5), env(safe-area-inset-left, 0px));
+  padding-right:  max(var(--space-5), env(safe-area-inset-right, 0px));
 }
 
-.wordmark {
+@media (min-width: 768px) {
+  .page { padding-top: clamp(48px, 9vh, 96px); }
+}
+
+.shell          { width: 100%; max-width: var(--col-sender); }
+.shell--reading { max-width: var(--col-reading); }
+
+
+/* 4. BRAND ================================================================= */
+/* Lockup: [logo] SHIVIR. The mark is the approved logo image — see
+   templates/_brand.html. No card, no border, no recolour. */
+
+.brand {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: var(--space-3);
+  height: var(--logo-h);
+  margin-bottom: var(--space-7);
+}
+
+.brand__mark {
+  flex: none;
+  display: block;
+  height: 100%;
+  width: auto;            /* proportional: height drives width, never both */
+  max-width: none;
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
+.brand__word {
+  font-size: calc(var(--logo-h) * 0.62);
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+
+
+/* 5. RECIPIENT ============================================================= */
+
+.recipient {
+  text-align: center;
+  margin-bottom: var(--space-6);
+}
+
+.recipient__name {
+  font-size: var(--text-title);
+  line-height: 1.14;
   font-weight: 700;
-  font-size: 20px;
-  color: var(--color-primary);
-  margin-bottom: 24px;
+  letter-spacing: -0.028em;
+  text-wrap: balance;
+  hyphens: auto;
+  overflow-wrap: anywhere;   /* last resort for unbreakable names */
 }
 
-.reassurance {
-  font-size: 15px;
-  color: var(--color-muted);
-  margin-bottom: 20px;
+.recipient__hint {
+  margin-top: var(--space-2);
+  color: var(--text-muted);
+  font-size: 0.9375rem;
+  line-height: 1.5;
 }
 
-.reassurance strong {
-  color: var(--color-text);
+
+/* 6. COMPOSER ============================================================== */
+
+.composer {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-glass);
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(140%);
+          backdrop-filter: blur(var(--blur)) saturate(140%);
+  transition:
+    border-color var(--dur-2) var(--ease-out),
+    box-shadow   var(--dur-2) var(--ease-out),
+    background   var(--dur-2) var(--ease-out);
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .composer, .panel { background: var(--glass-solid); }
+}
+
+@media (hover: hover) {
+  .composer:hover { border-color: var(--border-hover); }
+}
+
+.composer:focus-within {
+  background: var(--glass-focus);
+  border-color: var(--border-focus);
+  box-shadow: var(--shadow-focus);
 }
 
 textarea#composer {
+  display: block;
   width: 100%;
-  min-height: 140px;
-  border-radius: var(--radius-input);
-  border: 1px solid rgba(138, 138, 153, 0.35);
-  background: var(--color-card);
-  color: var(--color-text);
-  padding: 14px 16px;
-  font-size: 16px;
-  font-family: inherit;
-  resize: vertical;
+  min-height: 9.5rem;
+  max-height: 17rem;
+  padding: var(--space-5) var(--space-5) var(--space-2);
+  border: 0;
+  outline: 0;                       /* focus is shown by .composer:focus-within */
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  background: transparent;
+  color: var(--text);
+  font-size: var(--text-md);        /* ≥16px: no iOS zoom-on-focus */
+  line-height: 1.55;
+  letter-spacing: -0.006em;
+  caret-color: var(--cyan-300);
+  resize: none;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(103, 232, 249, 0.25) transparent;
 }
 
-textarea#composer:focus {
-  outline: 2px solid var(--color-primary);
-  outline-offset: 1px;
+textarea#composer::placeholder {
+  color: var(--text-placeholder);
+  opacity: 1;
 }
 
-.prompts {
+textarea#composer[readonly] { cursor: progress; }
+
+.composer__foot {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  min-height: 40px;
+  padding: var(--space-1) var(--space-4) var(--space-3);
+}
+
+/* Counter: a small progress ring + numbers, part of the composer. */
+.counter {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  transition: color var(--dur-2) var(--ease-out);
+}
+
+.counter__ring { width: 20px; height: 20px; transform: rotate(-90deg); flex: none; }
+.counter__track { fill: none; stroke: rgba(103, 232, 249, 0.16); stroke-width: 2.5; }
+.counter__bar {
+  fill: none;
+  stroke: var(--cyan-300);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  transition: stroke-dashoffset var(--dur-2) var(--ease-out), stroke var(--dur-2) var(--ease-out);
+}
+
+.counter[data-level="warn"] { color: var(--text-soft); }
+.counter[data-level="warn"] .counter__bar { stroke: var(--warn); }
+.counter[data-level="max"]  { color: var(--text); }
+.counter[data-level="max"]  .counter__bar { stroke: var(--danger); }
+
+
+/* 7. STARTERS (suggested prompt chips) ===================================== */
+
+.starters {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin: 12px 0;
+  justify-content: center;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
 }
 
 .prompt-chip {
-  background: var(--color-card);
-  border: 1px solid rgba(138, 138, 153, 0.35);
-  color: var(--color-text);
-  border-radius: 999px;
-  padding: 8px 14px;
-  font-size: 13px;
-  min-height: 32px;
+  appearance: none;
+  min-height: 40px;
+  max-width: 100%;
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--glass-chip);
+  color: var(--text-soft);
+  font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.25;
+  text-align: center;
+  overflow-wrap: anywhere;
   cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    background   var(--dur-2) var(--ease-out),
+    border-color var(--dur-2) var(--ease-out),
+    color        var(--dur-2) var(--ease-out),
+    transform    var(--dur-1) var(--ease-out);
 }
 
-.counter-row {
-  display: flex;
-  justify-content: flex-end;
-  font-size: 13px;
-  color: var(--color-muted);
-  margin-top: 6px;
+@media (pointer: coarse) {
+  .prompt-chip { min-height: var(--hit); }
 }
 
-.counter-row.over-limit {
-  color: var(--color-error);
+@media (hover: hover) {
+  .prompt-chip:hover {
+    background: var(--glass-chip-hover);
+    border-color: var(--border-hover);
+    color: var(--text);
+  }
 }
+
+.prompt-chip:active { transform: scale(0.97); background: var(--glass-chip-hover); }
+.prompt-chip:disabled { opacity: 0.5; cursor: default; }
+
+/* Selected: the prompt just inserted. */
+.prompt-chip.is-picked { animation: chip-pick 320ms var(--ease-out); }
+.prompt-chip[aria-pressed="true"] {
+  border-color: var(--border-focus);
+  background: var(--glass-chip-hover);
+  color: var(--text);
+}
+
+
+/* 8. BUTTONS =============================================================== */
+
+.actions { margin-top: var(--space-6); }
 
 button.primary {
-  min-height: 48px;
-  border-radius: var(--radius-button);
-  background: var(--color-primary);
-  color: #ffffff;
-  border: none;
-  font-size: 16px;
-  font-weight: 600;
+  position: relative;
+  appearance: none;
+  display: grid;
+  place-items: center;
   width: 100%;
-  margin-top: 16px;
-  transition: opacity 150ms ease-out;
+  min-height: var(--control-h);
+  padding: 0 var(--space-6);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--gradient-brand);
+  color: var(--on-accent);
+  font-size: var(--text-md);
+  font-weight: 650;
+  letter-spacing: -0.006em;
+  box-shadow: var(--shadow-cta);
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    transform  var(--dur-1) var(--ease-out),
+    filter     var(--dur-2) var(--ease-out),
+    background var(--dur-2) var(--ease-out),
+    color      var(--dur-2) var(--ease-out),
+    box-shadow var(--dur-2) var(--ease-out);
 }
 
-button.primary:disabled {
-  opacity: 0.4;
+@media (hover: hover) {
+  button.primary:not(:disabled):hover {
+    filter: brightness(1.06) saturate(1.05);
+    transform: translateY(-1px);
+  }
 }
+
+button.primary:not(:disabled):active { transform: scale(0.985); filter: brightness(0.97); }
+button.primary:focus-visible { outline-offset: 4px; }
+
+/* Empty / invalid */
+button.primary:disabled {
+  background: rgba(103, 232, 249, 0.05);
+  color: var(--text-muted);
+  box-shadow: inset 0 0 0 1px var(--border);
+  cursor: not-allowed;
+}
+
+/* Send button: two stacked faces (label / busy); only the current one shows. */
+.btn__face {
+  grid-area: 1 / 1;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  transition: opacity var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out),
+              visibility 0s linear 0s;
+}
+
+#sendButton[data-state="idle"]    .btn__face--busy,
+#sendButton[data-state="loading"] .btn__face--idle {
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(6px);
+  transition: opacity var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out),
+              visibility 0s linear var(--dur-2);
+}
+
+/* Sending: the real request is in flight (not timed, not faked). */
+#sendButton[data-state="loading"] { cursor: progress; }
+#sendButton[data-state="loading"]:disabled {
+  background: var(--gradient-brand);
+  color: var(--on-accent);
+  box-shadow: var(--shadow-cta);
+  opacity: 0.85;
+  cursor: progress;
+}
+
+.btn__spinner { width: 18px; height: 18px; animation: spin 800ms linear infinite; }
+.btn__spinner circle { fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; }
+.btn__spinner .track { opacity: 0.25; }
+.btn__spinner .arc   { stroke-dasharray: 22 60; }
 
 button.secondary {
-  min-height: 44px;
-  border-radius: var(--radius-button);
-  background: transparent;
-  color: var(--color-primary);
-  border: 1px solid var(--color-primary);
-  font-size: 15px;
-  font-weight: 600;
+  appearance: none;
   width: 100%;
-  margin-top: 10px;
+  min-height: var(--hit);
+  padding: 0 var(--space-5);
+  border: 1px solid var(--border-hover);
+  border-radius: var(--radius-md);
+  background: var(--glass-chip);
+  color: var(--cyan-200);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: background var(--dur-2) var(--ease-out), border-color var(--dur-2) var(--ease-out);
 }
+@media (hover: hover) {
+  button.secondary:hover { background: var(--glass-chip-hover); border-color: var(--border-focus); }
+}
+
+.button-row { display: flex; gap: var(--space-3); width: 100%; margin-top: var(--space-2); }
+.button-row button { flex: 1; min-width: 0; padding-left: var(--space-3); padding-right: var(--space-3); }
+.button-row button.primary { min-height: var(--hit); font-size: 0.9375rem; }
+
+
+/* 9. ASSURANCE (privacy reassurance under the CTA) ========================= */
+
+.assurance {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: var(--space-4);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  text-align: center;
+}
+
+.assurance__line { display: inline-flex; align-items: center; gap: 6px; }
+.assurance__icon { flex: none; width: 14px; height: 14px; color: var(--cyan-300); }
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--hit);
+  padding: 0 var(--space-2);
+  color: var(--link);
+  text-decoration: underline;
+  text-decoration-color: rgba(103, 232, 249, 0.38);
+  text-underline-offset: 4px;
+  transition: text-decoration-color var(--dur-2) var(--ease-out), color var(--dur-2) var(--ease-out);
+}
+.link:hover { color: var(--cyan-200); text-decoration-color: currentColor; }
+
+
+/* 10. READING PANEL (privacy) ============================================== */
+
+.panel {
+  background: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-glass);
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(140%);
+          backdrop-filter: blur(var(--blur)) saturate(140%);
+  padding: clamp(22px, 5vw, 44px);
+}
+
+.panel__title {
+  padding-bottom: var(--space-5);
+  margin-bottom: var(--space-5);
+  border-bottom: 1px solid var(--border);
+  /* Smaller floor than --text-title: "конфиденциальности" must fit a 320px panel. */
+  font-size: clamp(1.3rem, 0.9rem + 2.4vw, 2.25rem);
+  line-height: 1.15;
+  font-weight: 700;
+  letter-spacing: -0.028em;
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+
+.prose { font-size: var(--text-base); line-height: 1.72; color: var(--text-soft); }
+.prose > * + * { margin-top: var(--space-5); }
+.prose p { text-wrap: pretty; overflow-wrap: break-word; }
+.prose .prose__lead,
+.prose .prose__note { text-wrap: wrap; }
+.prose strong { color: var(--text); font-weight: 600; }
+
+.prose__lead { font-size: var(--text-lg); line-height: 1.6; color: var(--text); }
+
+.prose__note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid rgba(103, 232, 249, 0.2);
+  border-radius: var(--radius-md);
+  background: rgba(6, 182, 212, 0.08);
+  color: var(--cyan-50);
+  font-weight: 500;
+}
+.prose__note svg { flex: none; width: 18px; height: 18px; margin-top: 0.28em; color: var(--cyan-300); }
+
+@media (min-width: 768px) {
+  .prose { font-size: var(--text-md); }
+  .prose__lead { font-size: 1.1875rem; }
+}
+
+
+/* 11. STATE VIEWS (success / rate-limited / warning / error / invalid) ===== */
 
 .state-overlay {
   display: flex;
@@ -157,91 +602,148 @@ button.secondary {
   align-items: center;
   justify-content: center;
   text-align: center;
-  gap: 12px;
-  flex: 1;
-  padding: 32px 8px;
-  animation: fade-in 200ms ease-out;
+  gap: var(--space-4);
+  width: 100%;
+  padding: var(--space-8) var(--space-6);
+  background: var(--glass);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-glass);
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(140%);
+          backdrop-filter: blur(var(--blur)) saturate(140%);
+  animation: enter var(--dur-3) var(--ease-out) both;
 }
-
-.state-overlay[hidden] {
-  display: none;
-}
-
-@keyframes fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
+.state-overlay[hidden] { display: none; }
+.state-overlay button.secondary { margin-top: var(--space-2); }
 
 .icon-badge {
+  display: grid;
+  place-items: center;
   width: 56px;
   height: 56px;
   border-radius: 50%;
+  font-size: 26px;
+  line-height: 1;
+}
+.icon-badge.success { background: rgba(6, 182, 212, 0.14); color: var(--cyan-300); box-shadow: inset 0 0 0 1px var(--border-focus); }
+.icon-badge.warning { background: rgba(251, 191, 36, 0.10); color: var(--warn);    box-shadow: inset 0 0 0 1px rgba(251, 191, 36, 0.30); }
+.icon-badge.error   { background: rgba(251, 113, 133, 0.10); color: var(--danger); box-shadow: inset 0 0 0 1px rgba(251, 113, 133, 0.30); }
+
+.state-title {
+  font-size: var(--text-lg);
+  line-height: 1.4;
+  font-weight: 600;
+  text-wrap: balance;
+}
+
+
+/* Success (sent): same glass language as the composer; the check is a small
+   confirmation detail, the CTA a quiet next step. */
+.state-overlay--success {
+  gap: var(--space-5);
+  margin-top: var(--space-2);
+  padding: var(--space-8) var(--space-5) var(--space-6);
+  border-color: var(--border-hover);
+  background:
+    radial-gradient(120% 70% at 50% 0%, rgba(6, 182, 212, 0.12), transparent 70%),
+    var(--glass);
+  box-shadow: var(--shadow-glass), 0 26px 60px -34px rgba(6, 182, 212, 0.38);
+}
+
+.success__icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  color: var(--cyan-300);
+  background: rgba(6, 182, 212, 0.12);
+  box-shadow: inset 0 0 0 1px var(--border-focus), 0 0 28px -8px rgba(103, 232, 249, 0.5);
+}
+.success__icon path {
+  stroke-dasharray: 24;
+  stroke-dashoffset: 24;
+  animation: draw 420ms 120ms var(--ease-out) forwards;
+}
+
+.success__copy { display: grid; gap: var(--space-2); }
+.success__title {
+  font-size: 1.375rem;
+  line-height: 1.25;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+.success__note {
+  color: var(--text-muted);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+.success__cta {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 28px;
-}
-
-.icon-badge.success {
-  background: rgba(34, 197, 94, 0.12);
-  color: var(--color-success);
-}
-
-.icon-badge.warning {
-  background: rgba(245, 158, 11, 0.12);
-  color: #f59e0b;
-}
-
-.icon-badge.error {
-  background: rgba(239, 68, 68, 0.12);
-  color: var(--color-error);
-}
-
-.state-title {
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.state-body {
-  color: var(--color-muted);
-  font-size: 14px;
-}
-
-.spinner {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  border: 3px solid rgba(91, 79, 232, 0.2);
-  border-top-color: var(--color-primary);
-  animation: spin 700ms linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.button-row {
-  display: flex;
-  gap: 10px;
   width: 100%;
-  margin-top: 8px;
+  min-height: 48px;
+  margin-top: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  border: 1px solid var(--border-hover);
+  border-radius: var(--radius-md);
+  background: var(--glass-chip);
+  color: var(--cyan-200);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: center;
+  text-decoration: none;
+  text-wrap: balance;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: background var(--dur-2) var(--ease-out), border-color var(--dur-2) var(--ease-out);
+}
+@media (hover: hover) {
+  .success__cta:hover { background: var(--glass-chip-hover); border-color: var(--border-focus); }
+}
+.success__cta:active { background: var(--glass-chip-hover); }
+
+
+/* 12. MOTION =============================================================== */
+
+/* One short entrance, staggered by --i. Nothing loops or moves on its own. */
+.enter {
+  animation: enter var(--dur-3) var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 55ms);
 }
 
-.button-row button {
-  flex: 1;
-}
+@keyframes enter      { from { opacity: 0; transform: translateY(10px); } }
+@keyframes draw       { to   { stroke-dashoffset: 0; } }
+@keyframes spin       { to   { transform: rotate(360deg); } }
+@keyframes chip-pick  { 0% { transform: scale(0.96); border-color: var(--border-focus); } 100% { transform: scale(1); } }
+@keyframes pulse      { 50% { opacity: 0.45; } }
 
 @media (prefers-reduced-motion: reduce) {
-  * {
-    animation-duration: 0.001ms !important;
-    transition-duration: 0.001ms !important;
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
+    scroll-behavior: auto !important;
   }
+  /* Loading must still read as "working": a gentle pulse instead of a spin. */
+  .btn__spinner { animation: pulse 1.4s ease-in-out infinite !important; animation-duration: 1.4s !important; }
+}
+
+
+/* 13. UTILITIES ============================================================ */
+
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  margin: -1px; padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }

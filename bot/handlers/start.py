@@ -135,19 +135,6 @@ async def on_link_show_reply_button(message: Message, session: AsyncSession, set
     await _render_link_ready(message, lang, settings, token, tg_user_id, edit=False)
 
 
-@router.callback_query(F.data == "link:copy")
-async def on_link_copy(callback: CallbackQuery, session: AsyncSession) -> None:
-    tg_user_id = callback.from_user.id
-    user = await get_or_create_user(session, tg_user_id)
-    link = await get_active_link_for_owner(session, tg_user_id)
-    if link is None:
-        link = await create_link(session, owner_user_id=tg_user_id)
-
-    await track("link_shared", user_id=tg_user_id, link_id=link.id, channel="copy")
-
-    await callback.answer(t("copy_link_toast", user.lang), show_alert=True)
-
-
 @router.callback_query(F.data == "home:open")
 async def on_home_open(callback: CallbackQuery, session: AsyncSession) -> None:
     user = await get_or_create_user(session, callback.from_user.id)
