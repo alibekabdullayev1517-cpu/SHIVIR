@@ -16,32 +16,53 @@ PARAGRAPHS = {
     "uz": [
         "Shivir — anonim xabar almashish xizmati. Ushbu sahifa nimalarni saqlashimizni "
         "va saqlamasligimizni ochiq tushuntiradi.",
-        "Biz nimalarni saqlaymiz: xabar oluvchining Telegram identifikatori, xabar matni "
-        "(siz uni o'chirmaguningizcha), havola tokenlari, xabar yuborish vaqti va umumiy "
-        "(shaxsga bog'liq bo'lmagan) statistika.",
+        "Biz nimalarni saqlaymiz: xabar oluvchining Telegram identifikatori, ismi va tili, xabar matni "
+        "(siz uni o'chirmaguningizcha), havola tokenlari, xabar yuborish vaqti va foydalanish statistikasi. "
+        "Oluvchining harakatlari (masalan, qutini ochish) uning identifikatori bilan bog'lanadi; "
+        "yuboruvchining harakatlari esa hech qanday Telegram hisobiga bog'lanmaydi.",
         "Suiiste'moldan himoyalanish uchun yuboruvchining IP-manzili va brauzeri asosida "
-        "bir tomonlama xesh (hash) hisoblanadi. Bu xesh asl IP-manzilga qaytarib bo'lmaydi — "
-        "u faqat spam/tahdidlarni cheklash va bloklashni ishlatish uchun ishlatiladi.",
+        "bir tomonlama xesh (hash) hisoblanadi va ma'lumotlar bazasida saqlanadi. Bu xeshdan asl "
+        "IP-manzilni tiklab bo'lmaydi — u faqat spam/tahdidlarni cheklash va bloklash uchun ishlatiladi. "
+        "Shu sababli bir xil qurilmadan kelgan xabarlar bir-biriga bog'lanishi mumkin.",
         "Biz saqlamaymiz: yuboruvchining Telegram identifikatori yoki ismi, aniq joylashuv, "
-        "doimiy kuzatuv cookie'lari, yoki xom IP-manzillarning uzoq muddatli jurnali.",
-        "Xabarni o'chirsangiz, uning matni butunlay o'chiriladi. Agar xabar shikoyat qilingan "
-        "bo'lsa, faqat shikoyat vaqtidagi nusxa moderatsiya uchun saqlanadi — bu ham faqat "
-        "zarur muddatga.",
+        "doimiy kuzatuv cookie'lari. Veb-server texnik jurnallarida yuboruvchining IP-manzili qisqa "
+        "muddat (hozircha taxminan ikki hafta) saqlanadi va keyin o'chiriladi; xom IP-manzillarning "
+        "uzoq muddatli jurnali yuritilmaydi. Shu vaqt oralig'ida xizmat administratori xabar vaqtini "
+        "server jurnali bilan solishtirib, yuboruvchining IP-manzilini bilib olishi texnik jihatdan mumkin.",
+        "Xabarni o'chirsangiz, uning matni ma'lumotlar bazasidan o'chiriladi; kunlik zaxira nusxalarda "
+        "u yana taxminan ikki hafta saqlanib qolishi mumkin. Agar xabar shikoyat qilingan yoki xavfsizlik "
+        "filtri uni jiddiy xavfli deb belgilagan bo'lsa, moderatsiya uchun nusxa saqlanadi; hozircha "
+        "bunday nusxalar avtomatik o'chirilmaydi.",
+        "Xabar yuborilganda ekranda tasdiq ko'rsatiladi. Agar oluvchi sizni bloklagan bo'lsa yoki xabar "
+        "xavfsizlik qoidalariga zid deb topilsa, u oluvchiga yetkazilmasligi mumkin.",
+        "Shivir o'zi xabar to'qimaydi: soxta xabarlar, soxta bildirishnomalar va yuboruvchi "
+        "haqida soxta ishoralar yo'q.",
         "Yuboruvchining shaxsi hech qachon xabar oluvchiga ko'rsatilmaydi.",
     ],
     "ru": [
         "Shivir — сервис для анонимных сообщений. Эта страница честно объясняет, что мы "
         "храним, а что нет.",
-        "Что мы храним: Telegram ID получателя, текст сообщения (пока вы его не удалите), "
-        "токены ссылок, время отправки и агрегированную (обезличенную) статистику.",
-        "Для защиты от злоупотреблений IP-адрес и браузер отправителя хешируются "
-        "односторонним способом. Этот хеш нельзя обратить обратно в IP-адрес — он "
-        "используется только для ограничения спama и блокировок.",
-        "Что мы не храним: Telegram ID или имя отправителя, точное местоположение, "
-        "постоянные отслеживающие cookie, длительные журналы сырых IP-адресов.",
-        "Если вы удаляете сообщение, его текст удаляется полностью. Если на сообщение "
-        "была подана жалоба, копия на момент жалобы сохраняется только для модерации — "
-        "и только на необходимый срок.",
+        "Что мы храним: Telegram ID, имя и язык получателя, текст сообщения (пока вы его не удалите), "
+        "токены ссылок, время отправки и статистику использования. Действия получателя (например, "
+        "открытие входящих) связаны с его идентификатором; действия отправителя не связываются "
+        "ни с одним аккаунтом Telegram.",
+        "Для защиты от злоупотреблений на основе IP-адреса и браузера отправителя вычисляется "
+        "односторонний хеш, который хранится в базе данных. Из этого хеша нельзя восстановить "
+        "IP-адрес — он используется только для ограничения спама/угроз и блокировок. Поэтому "
+        "сообщения с одного и того же устройства могут связываться между собой.",
+        "Что мы не храним: Telegram ID или имя отправителя, точное местоположение, постоянные "
+        "отслеживающие cookie. В технических журналах веб-сервера IP-адрес отправителя хранится "
+        "недолго (сейчас около двух недель), затем удаляется; долгосрочный журнал сырых "
+        "IP-адресов не ведётся. В этот период администратор сервиса технически может сопоставить время "
+        "сообщения с журналом сервера и узнать IP-адрес отправителя.",
+        "Если вы удаляете сообщение, его текст удаляется из базы данных; в ежедневных резервных "
+        "копиях он может сохраняться ещё около двух недель. Если на сообщение подана жалоба или "
+        "защитный фильтр отметил его как серьёзно опасное, для модерации сохраняется копия; сейчас "
+        "такие копии автоматически не удаляются.",
+        "После отправки вы видите подтверждение. Если получатель вас заблокировал или сообщение "
+        "нарушает правила безопасности, оно может быть не доставлено.",
+        "Shivir не выдумывает сообщения: никаких фейковых сообщений, уведомлений и ложных "
+        "подсказок о том, кто отправитель.",
         "Личность отправителя никогда не показывается получателю.",
     ],
 }

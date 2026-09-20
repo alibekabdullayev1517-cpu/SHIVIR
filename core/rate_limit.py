@@ -48,3 +48,23 @@ async def check_send_rate_limits(
         return RateLimitResult(allowed=False, scope="global")
 
     return RateLimitResult(allowed=True)
+
+
+async def check_track_rate_limit(
+    redis: Redis,
+    *,
+    fingerprint_hash: str,
+    per_fingerprint_limit: int,
+    per_fingerprint_window: int,
+    global_limit: int,
+    global_window: int,
+) -> RateLimitResult:
+    """Throttle for the anonymous analytics beacon. Same fixed-window counters and
+    the same anonymous fingerprint hash as the send limits (nothing new is stored,
+    and no raw IP touches Redis); separate key names, so beacon traffic can never
+    consume a sender's message budget."""
+    if not await _check_window(redis, f"rl:track:fp:{fingerprint_hash}", per_fingerprint_limit, per_fingerprint_window):
+        return RateLimitResult(allowed=False, scope="fingerprint")
+    if not await _check_window(redis, "rl:track:global", global_limit, global_window):
+        return RateLimitResult(allowed=False, scope="global")
+    return RateLimitResult(allowed=True)

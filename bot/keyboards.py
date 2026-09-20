@@ -5,6 +5,7 @@ from aiogram.types import InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMar
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from core.copy import t
+from core.link_prompts import DEFAULT_KEY, DEFAULT_LABEL, PRESET_KEYS, label_for
 from core.models import Message
 from core.services.links import build_telegram_share_url
 
@@ -101,14 +102,34 @@ def report_reason_keyboard(message_id: int, lang: str) -> InlineKeyboardMarkup:
     return b.as_markup()
 
 
-def settings_keyboard(lang: str) -> InlineKeyboardMarkup:
+def settings_keyboard(lang: str, paused: bool = False) -> InlineKeyboardMarkup:
     b = InlineKeyboardBuilder()
     b.button(text=("Maxfiylik" if lang == "uz" else "Приватность"), callback_data="settings:privacy")
     b.button(text=("Xavfsizlik" if lang == "uz" else "Безопасность"), callback_data="settings:safety")
     b.button(text=("Yordam" if lang == "uz" else "Помощь"), callback_data="settings:help")
     b.button(text=("Havolani yangilash" if lang == "uz" else "Обновить ссылку"), callback_data="settings:regenerate")
+    b.button(text=t("settings_prompt_btn", lang), callback_data="settings:prompt")
+    if paused:
+        b.button(text=t("settings_resume_btn", lang), callback_data="settings:resume")
+    else:
+        b.button(text=t("settings_pause_btn", lang), callback_data="settings:pause")
     b.button(text=t("back_button", lang), callback_data="home:open")
-    b.adjust(2, 2, 1)
+    b.adjust(2, 2, 2, 1)
+    return b.as_markup()
+
+
+def prompt_keyboard(lang: str, current: str) -> InlineKeyboardMarkup:
+    """One button per allow-listed preset (✓ marks the active one), plus
+    "default" and Back. The callback data is `settings:promptset:<key>`; the
+    handler re-validates <key> against the same allow-list."""
+    b = InlineKeyboardBuilder()
+    for key in PRESET_KEYS:
+        mark = "✓ " if key == current else ""
+        b.button(text=f"{mark}{label_for(key, lang)}", callback_data=f"settings:promptset:{key}")
+    default_mark = "✓ " if current == DEFAULT_KEY else ""
+    b.button(text=f"{default_mark}{DEFAULT_LABEL.get(lang, DEFAULT_LABEL['uz'])}", callback_data=f"settings:promptset:{DEFAULT_KEY}")
+    b.button(text=t("back_button", lang), callback_data="settings:open")
+    b.adjust(2, 2, 2, 1, 1)
     return b.as_markup()
 
 

@@ -33,8 +33,20 @@ COPY: dict[str, dict[str, str]] = {
         "ru": "Это сообщение будет удалено навсегда",
     },
     "privacy_summary": {
-        "uz": "Biz yuboruvchining shaxsini saqlamaymiz va hech qachon oshkor qilmaymiz.",
-        "ru": "Мы не сохраняем и никогда не раскрываем личность отправителя.",
+        "uz": (
+            "Yuboruvchining shaxsi xabar oluvchiga hech qachon ko'rsatilmaydi. "
+            "Suiiste'moldan himoyalanish uchun bazada IP-manzil emas, undan hisoblangan bir tomonlama "
+            "xesh saqlanadi; veb-server jurnallarida IP-manzil qisqa muddat qolishi mumkin.\n\n"
+            "Shivir o'zi xabar to'qimaydi: soxta xabarlar, soxta bildirishnomalar va "
+            "yuboruvchi haqida soxta ishoralar yo'q."
+        ),
+        "ru": (
+            "Личность отправителя никогда не показывается получателю. "
+            "Для защиты от злоупотреблений в базе хранится не IP-адрес, а вычисленный из него "
+            "односторонний хеш; в журналах веб-сервера IP-адрес может кратко сохраняться.\n\n"
+            "Shivir сам не выдумывает сообщения: никаких фейковых сообщений, уведомлений "
+            "и ложных подсказок о том, кто отправитель."
+        ),
     },
     "safety_summary": {
         "uz": "Haqorat, tahdid yoki nomaqbul xabarlar taqiqlanadi.",
@@ -52,6 +64,32 @@ COPY: dict[str, dict[str, str]] = {
         "uz": "Ular kim yozganini bilishmaydi.",
         "ru": "Они не узнают, кто вы.",
     },
+    "sender_paused": {
+        "uz": "Bu havola hozircha xabar qabul qilmayapti.",
+        "ru": "Эта ссылка сейчас не принимает сообщения.",
+    },
+    "sent_invite": {
+        "uz": "Xohlasang, sen ham o'z havolangni yaratib, do'stlaringdan anonim xabar ola olasan.",
+        "ru": "Если хочешь, создай свою ссылку и получай анонимные сообщения от друзей.",
+    },
+    "link_paused_notice": {
+        "uz": "⏸ Havolangiz to'xtatilgan — yangi xabarlar kelmaydi. Sozlamalardan yoqishingiz mumkin.",
+        "ru": "⏸ Ваша ссылка приостановлена — новые сообщения не приходят. Включить можно в настройках.",
+    },
+    "settings_paused_line": {"uz": "⏸ Havola to'xtatilgan", "ru": "⏸ Ссылка приостановлена"},
+    "settings_prompt_btn": {"uz": "✏️ Havola matni", "ru": "✏️ Текст ссылки"},
+    "settings_pause_btn": {"uz": "⏸ Havolani to'xtatish", "ru": "⏸ Приостановить ссылку"},
+    "settings_resume_btn": {"uz": "▶️ Havolani yoqish", "ru": "▶️ Включить ссылку"},
+    "pause_on_toast": {
+        "uz": "Havola to'xtatildi. Yangi xabarlar qabul qilinmaydi.",
+        "ru": "Ссылка приостановлена. Новые сообщения не принимаются.",
+    },
+    "pause_off_toast": {"uz": "Havola yoqildi.", "ru": "Ссылка снова включена."},
+    "prompt_menu_title": {
+        "uz": "Havolangiz sahifasida ko'rinadigan qisqa matnni tanlang:",
+        "ru": "Выберите короткую строку, которую увидят на странице вашей ссылки:",
+    },
+    "prompt_saved_toast": {"uz": "Saqlandi.", "ru": "Сохранено."},
     "compose_label": {"uz": "Anonim xabaringiz", "ru": "Ваше анонимное сообщение"},
     "prompts_label": {
         "uz": "Xabarni boshlash uchun takliflar",
@@ -69,11 +107,11 @@ COPY: dict[str, dict[str, str]] = {
     "compose_placeholder": {"uz": "Xabaringizni yozing...", "ru": "Напишите сообщение..."},
     "send_cta": {"uz": "Yuborish", "ru": "Отправить"},
     "send_success": {
-        "uz": "Xabaringiz yuborildi ✅ Anonimligingiz saqlanadi.",
-        "ru": "Сообщение отправлено ✅ Ваша анонимность сохранена.",
+        "uz": "Xabaringiz yuborildi ✅ Oluvchi kim yozganini bilmaydi.",
+        "ru": "Сообщение отправлено ✅ Получатель не узнает, кто вы.",
     },
     "sent_title": {"uz": "Xabaringiz yuborildi", "ru": "Сообщение отправлено"},
-    "sent_reassurance": {"uz": "Anonimligingiz saqlanadi.", "ru": "Ваша анонимность сохранена."},
+    "sent_reassurance": {"uz": "Oluvchi kim yozganini bilmaydi.", "ru": "Получатель не узнает, кто вы."},
     "send_success_secondary_cta": {
         "uz": "O'zingizning Shivir havolangizni yarating",
         "ru": "Создайте свою ссылку Shivir",

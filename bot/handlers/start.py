@@ -22,6 +22,7 @@ from core.services.links import (
     get_active_link_for_owner,
     get_or_create_user,
     has_any_link,
+    is_paused,
     set_display_name,
 )
 
@@ -100,7 +101,9 @@ async def on_create_link(callback: CallbackQuery, session: AsyncSession, setting
         # the meme channel, etc.) and created their first-ever link.
         await track("new_link_created", user_id=tg_user_id, link_id=link.id)
 
-    await _render_link_ready(callback.message, user.lang, settings, link.token, tg_user_id, edit=True)
+    await _render_link_ready(
+        callback.message, user.lang, settings, link.token, tg_user_id, edit=True, paused=is_paused(user)
+    )
     if is_first_ever_link:
         # ReplyKeyboardMarkup can only be attached via a NEW message, never
         # via editMessageText (which _render_link_ready used above) — this
@@ -111,28 +114,28 @@ async def on_create_link(callback: CallbackQuery, session: AsyncSession, setting
     await callback.answer()
 
 
-async def _show_my_link(session: AsyncSession, tg_user_id: int) -> tuple[str, str]:
+async def _show_my_link(session: AsyncSession, tg_user_id: int) -> tuple[str, str, bool]:
     user = await get_or_create_user(session, tg_user_id)
     link = await get_active_link_for_owner(session, tg_user_id)
     if link is None:
         link = await create_link(session, owner_user_id=tg_user_id)
         await track("link_created", user_id=tg_user_id, link_id=link.id)
-    return user.lang, link.token
+    return user.lang, link.token, is_paused(user)
 
 
 @router.callback_query(F.data == "link:show")
 async def on_link_show(callback: CallbackQuery, session: AsyncSession, settings: Settings) -> None:
     tg_user_id = callback.from_user.id
-    lang, token = await _show_my_link(session, tg_user_id)
-    await _render_link_ready(callback.message, lang, settings, token, tg_user_id, edit=True)
+    lang, token, paused = await _show_my_link(session, tg_user_id)
+    await _render_link_ready(callback.message, lang, settings, token, tg_user_id, edit=True, paused=paused)
     await callback.answer()
 
 
 @router.message(F.text.in_(_LINK_LABELS))
 async def on_link_show_reply_button(message: Message, session: AsyncSession, settings: Settings) -> None:
     tg_user_id = message.from_user.id
-    lang, token = await _show_my_link(session, tg_user_id)
-    await _render_link_ready(message, lang, settings, token, tg_user_id, edit=False)
+    lang, token, paused = await _show_my_link(session, tg_user_id)
+    await _render_link_ready(message, lang, settings, token, tg_user_id, edit=False, paused=paused)
 
 
 @router.callback_query(F.data == "home:open")
@@ -154,10 +157,13 @@ async def _send_home(message: Message, lang: str) -> None:
 
 
 async def _render_link_ready(
-    message: Message, lang: str, settings: Settings, token: str, owner_user_id: int, *, edit: bool
+    message: Message, lang: str, settings: Settings, token: str, owner_user_id: int, *, edit: bool,
+    paused: bool = False,
 ) -> None:
     url = build_sender_url(settings.web_base_url, token)
     text = f"{t('link_ready_title', lang)}\n\n`{url}`"
+    if paused:
+        text += f"\n\n{t('link_paused_notice', lang)}"
     markup = link_ready_keyboard(lang, url)
     if edit:
         await message.edit_text(text, reply_markup=markup, parse_mode="Markdown")

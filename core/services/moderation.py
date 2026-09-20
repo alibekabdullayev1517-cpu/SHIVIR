@@ -6,7 +6,7 @@ across messages, which is the only stable signal we retain.
 
 from datetime import datetime, timezone
 
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,12 +15,58 @@ from core.models import Block, Message, ModerationAction, PublicLink, Report, Re
 
 MASS_ABUSE_REPORT_THRESHOLD = 3
 
+# How urgent a recipient's report is, by the reason they picked. Only orders the
+# moderator's queue — a report never removes the message or blocks anyone by itself.
+REPORT_SEVERITY = {"threat": "L3", "sexual": "L3", "harassment": "L2", "spam": "L1", "other": "L1"}
+
+
+async def is_already_reported(session: AsyncSession, message_id: int) -> bool:
+    """Whether this message already has a report (repeat reports are no-ops)."""
+    result = await session.execute(select(Report.id).where(Report.message_id == message_id).limit(1))
+    return result.scalars().first() is not None
+
 
 async def report_message(
     session: AsyncSession, message: Message, reason: str, *, auto_disable_threshold: int
 ) -> Report:
+    if reason not in REPORT_SEVERITY:
+        # The bot handler validates the callback value too; this keeps the
+        # service safe for any other caller (and away from the String(32) column).
+        raise ValueError("unknown report reason")
+
+    # One report per message: the first counts, repeats are no-ops. Otherwise one
+    # recipient could re-report the same message to inflate its abuse score, push
+    # their own link to the auto-disable threshold, or fake the "mass-abuse across
+    # messages" escalation against a sender.
+    prior = await session.execute(select(Report).where(Report.message_id == message.id).limit(1))
+    existing = prior.scalars().first()
+    if existing is not None:
+        return existing
+
     report = Report(message_id=message.id, reason=reason, body_snapshot=message.body)
     session.add(report)
+
+    # Put the report in front of the moderator. /modqueue reads moderation_actions,
+    # not reports, so without this row a single report was invisible to admins.
+    # Append-only (INSERT), as the production DB role allows nothing more on this
+    # table; one open item per message however many times it is reported. Carries
+    # the message text the recipient reported — never the sender fingerprint/IP.
+    target = f"message:{message.id}"
+    already_queued = await session.execute(
+        select(ModerationAction.id)
+        .where(ModerationAction.target == target, ModerationAction.action == "user_report")
+        .limit(1)
+    )
+    if already_queued.scalars().first() is None:
+        session.add(
+            ModerationAction(
+                target=target,
+                action="user_report",
+                severity=REPORT_SEVERITY[reason],
+                moderator="system",
+                reason=f"[reported: {reason}] {message.body}",
+            )
+        )
 
     # Reporting implies protective action: bump the message's own abuse signal
     # without requiring the recipient to also tap Block separately.
@@ -181,13 +227,18 @@ async def moderation_queue(session: AsyncSession, limit: int = 50) -> list[Moder
         select(ModerationAction.target).where(ModerationAction.moderator != "system").distinct()
     )
 
-    severity_order = {"L3": 0, "L2": 1, "L1": 2}
+    # Severity is ordered in SQL (not after a size-limited fetch), so a backlog of
+    # low-severity items can never push an older L3 out of the result.
+    severity_rank = case(
+        (ModerationAction.severity == "L3", 0),
+        (ModerationAction.severity == "L2", 1),
+        (ModerationAction.severity == "L1", 2),
+        else_=3,
+    )
     result = await session.execute(
         select(ModerationAction)
         .where(ModerationAction.moderator == "system", ModerationAction.target.notin_(resolved_targets))
-        .order_by(ModerationAction.created_at.desc())
-        .limit(limit * 3)
+        .order_by(severity_rank, ModerationAction.created_at.desc(), ModerationAction.id.desc())
+        .limit(limit)
     )
-    actions = list(result.scalars().all())
-    actions.sort(key=lambda a: (severity_order.get(a.severity, 3), -a.created_at.timestamp()))
-    return actions[:limit]
+    return list(result.scalars().all())

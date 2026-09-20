@@ -6,6 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.link_prompts import DEFAULT_KEY, is_valid_key
 from core.models import PublicLink, User
 
 
@@ -45,6 +46,53 @@ async def set_display_name(session: AsyncSession, user: User, display_name: str 
         settings["display_name"] = display_name
         user.settings = settings
         await session.commit()
+
+
+def is_paused(user: User | None) -> bool:
+    """Owner-controlled pause: the link keeps existing (and stays the same
+    link) but accepts no new messages. Deliberately NOT `PublicLink.active`:
+    that flag means "replaced or disabled by moderation", and create_link()
+    would instantly mint a fresh active link for an owner who has none —
+    silently undoing a pause."""
+    return bool(user and (user.settings or {}).get("paused") is True)
+
+
+async def set_paused(session: AsyncSession, user: User, paused: bool) -> bool:
+    """Returns True if the state actually changed (so callers only record an
+    analytics event on a real transition, not on a double tap)."""
+    if is_paused(user) == paused:
+        return False
+    settings = dict(user.settings or {})
+    if paused:
+        settings["paused"] = True
+    else:
+        settings.pop("paused", None)
+    user.settings = settings  # reassign: SQLAlchemy doesn't track in-place JSON edits
+    await session.commit()
+    return True
+
+
+def get_prompt_key(user: User | None) -> str:
+    key = (user.settings or {}).get("prompt") if user else None
+    return key if is_valid_key(key) else DEFAULT_KEY
+
+
+async def set_prompt_key(session: AsyncSession, user: User, key: str) -> bool:
+    """Stores a preset key (or clears it for DEFAULT_KEY). Rejects anything that
+    isn't an allow-listed preset — the caller passes callback data straight in,
+    so this is the validation boundary. Returns True if it changed."""
+    if key != DEFAULT_KEY and not is_valid_key(key):
+        raise ValueError("unknown prompt preset")
+    if get_prompt_key(user) == key:
+        return False
+    settings = dict(user.settings or {})
+    if key == DEFAULT_KEY:
+        settings.pop("prompt", None)
+    else:
+        settings["prompt"] = key
+    user.settings = settings
+    await session.commit()
+    return True
 
 
 async def has_any_link(session: AsyncSession, owner_user_id: int) -> bool:

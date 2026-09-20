@@ -30,6 +30,13 @@ class Settings(BaseSettings):
     rate_limit_send_global: int = 2000
     rate_limit_send_global_window_seconds: int = 60
 
+    # Anonymous analytics beacon (/s/<token>/track). Generous — a real visitor fires
+    # a couple of events per page — but bounded, so it can't be used to flood the events table.
+    rate_limit_track_per_fingerprint: int = 60
+    rate_limit_track_per_fingerprint_window_seconds: int = 300
+    rate_limit_track_global: int = 3000
+    rate_limit_track_global_window_seconds: int = 60
+
     link_auto_disable_report_threshold: int = 5
 
     # Comma-separated Telegram user IDs allowed to use moderation-queue bot commands.

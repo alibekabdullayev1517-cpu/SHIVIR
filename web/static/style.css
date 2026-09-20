@@ -680,6 +680,14 @@ button.secondary {
   line-height: 1.5;
 }
 
+.success__invite {
+  max-width: 26rem;
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  text-wrap: balance;
+}
+
 .success__cta {
   display: flex;
   align-items: center;

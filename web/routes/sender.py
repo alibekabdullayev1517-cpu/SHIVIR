@@ -3,6 +3,8 @@ field must be visible immediately, no separate 'start' tap), send, and the
 JSON API the page's own JS calls for send / message_started tracking.
 """
 
+import logging
+
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
@@ -15,13 +17,16 @@ from core.config import Settings, get_settings
 from core.copy import t
 from core.db import get_session
 from core.models import User
+from core.rate_limit import check_track_rate_limit
 from core.security import compute_fingerprint, generate_csrf_token, verify_csrf_token
-from core.services.links import get_link_by_token
+from core.link_prompts import line_for
+from core.services.links import get_link_by_token, get_prompt_key, is_paused
 from core.services.messages import MAX_MESSAGE_LENGTH, SendStatus, send_message
 from web import assets
 from web.prompts import pick_prompts, pool_payload
 
 router = APIRouter()
+logger = logging.getLogger("shivir.web.sender")
 templates = Jinja2Templates(directory="web/templates")
 assets.register(templates)
 
@@ -71,7 +76,16 @@ async def sender_landing(
     lang = owner.lang if owner else "uz"
     display_name = (owner.settings or {}).get("display_name") if owner else None
 
+    if is_paused(owner):
+        # Owner-controlled pause: neutral wording, no compose form, and no
+        # sender_page_viewed event (nobody can send from here).
+        return templates.TemplateResponse(
+            request, "invalid.html", {"lang": lang, "message": t("sender_paused", lang)}
+        )
+
     csrf_token = generate_csrf_token(settings.secret_key, context=token)
+    # Owner-chosen line: an allow-listed preset (core.link_prompts), never free text.
+    hint = line_for(get_prompt_key(owner), lang) or t("sender_hint", lang)
 
     await track("sender_page_viewed", link_id=link.id)
 
@@ -87,7 +101,9 @@ async def sender_landing(
             "prompt_pool": pool_payload(lang),
             "max_length": SENDER_UI_MAX_LENGTH,
             "copy": {
-                "hint": t("sender_hint", lang),
+                "hint": hint,
+                "paused": t("sender_paused", lang),
+                "sent_invite": t("sent_invite", lang),
                 "assurance": t("sender_assurance", lang),
                 "compose_label": t("compose_label", lang),
                 "prompts_label": t("prompts_label", lang),
@@ -139,6 +155,11 @@ async def sender_send(
     owner = await session.get(User, link.owner_user_id)
     lang = owner.lang if owner else "uz"
 
+    if is_paused(owner):
+        # A page opened before the owner paused can still POST: refuse here,
+        # before the rate-limit counters or the message store are touched.
+        return JSONResponse({"status": "paused", "message": t("sender_paused", lang)}, status_code=409)
+
     fingerprint = client_fingerprint(request, settings)
     result = await send_message(
         session,
@@ -183,10 +204,16 @@ async def sender_send(
 
 
 @router.post("/s/{token}/track")
-async def sender_track_event(token: str, request: Request, session: AsyncSession = Depends(get_session)) -> JSONResponse:
-    """The only client-triggered analytics beacon. Deliberately allow-lists a
-    single event: message_started can only be observed client-side (first
-    keystroke), and carries nothing sender-identifying."""
+async def sender_track_event(
+    token: str,
+    request: Request,
+    session: AsyncSession = Depends(get_session),
+    redis: Redis = Depends(get_redis),
+    settings: Settings = Depends(get_settings),
+) -> JSONResponse:
+    """The client-triggered analytics beacon. Deliberately allow-lists two events:
+    message_started (first keystroke) and sender_cta_clicked (tapped "create your
+    own link" on the success screen). Neither carries anything sender-identifying."""
     try:
         body = await request.json()
     except Exception:
@@ -196,10 +223,35 @@ async def sender_track_event(token: str, request: Request, session: AsyncSession
         # never a 500 for input this expected to be untrusted and low-stakes.
         return JSONResponse({"status": "ignored"})
 
-    if not isinstance(body, dict) or body.get("name") != "message_started":
+    name = body.get("name") if isinstance(body, dict) else None
+    if name not in ("message_started", "sender_cta_clicked"):
         return JSONResponse({"status": "ignored"})
+
+    # Throttle before touching the database. Checked only for well-formed events, so
+    # junk requests can't use up a real visitor's budget. Fails CLOSED: if Redis is
+    # unreachable the event is dropped (analytics loss) rather than allowing unbounded
+    # writes. Never affects /send, which has its own separate counters.
+    try:
+        limit = await check_track_rate_limit(
+            redis,
+            fingerprint_hash=client_fingerprint(request, settings),
+            per_fingerprint_limit=settings.rate_limit_track_per_fingerprint,
+            per_fingerprint_window=settings.rate_limit_track_per_fingerprint_window_seconds,
+            global_limit=settings.rate_limit_track_global,
+            global_window=settings.rate_limit_track_global_window_seconds,
+        )
+    except Exception:
+        logger.warning("track rate limiter unavailable; dropping analytics event")
+        return JSONResponse({"status": "ignored"})
+    if not limit.allowed:
+        return JSONResponse({"status": "rate_limited"}, status_code=429)
 
     link = await get_link_by_token(session, token)
     if link is not None:
-        await track("message_started", link_id=link.id)
+        if name == "message_started":
+            await track("message_started", link_id=link.id)
+        else:
+            # Aggregate only: no link id, no user id — this beacon must never
+            # be joinable to a recipient or to a Telegram account.
+            await track("sender_cta_clicked")
     return JSONResponse({"status": "ok"})

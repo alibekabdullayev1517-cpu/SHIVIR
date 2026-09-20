@@ -19,7 +19,13 @@ from core.services.messages import (
     get_message_for_recipient,
     mark_opened,
 )
-from core.services.moderation import block_sender, delete_message, report_message
+from core.services.moderation import (
+    REPORT_SEVERITY,
+    block_sender,
+    delete_message,
+    is_already_reported,
+    report_message,
+)
 from core.services.links import get_or_create_user
 
 from bot.keyboards import (
@@ -156,20 +162,28 @@ async def on_report_prompt(callback: CallbackQuery, session: AsyncSession) -> No
 
 @router.callback_query(F.data.startswith("msg:reportreason:"))
 async def on_report_reason(callback: CallbackQuery, session: AsyncSession, settings: Settings) -> None:
-    _, _, message_id_str, reason = callback.data.split(":")
-    message_id = int(message_id_str)
     tg_user_id = callback.from_user.id
     user = await get_or_create_user(session, tg_user_id)
+
+    # Callback data is client-controlled: accept only "msg:reportreason:<int>:<known reason>".
+    parts = callback.data.split(":")
+    if len(parts) != 4 or not parts[2].isdigit() or parts[3] not in REPORT_SEVERITY:
+        await callback.answer(t("generic_error", user.lang), show_alert=True)
+        return
+    message_id = int(parts[2])
+    reason = parts[3]
 
     message = await get_message_for_recipient(session, message_id, tg_user_id)
     if message is None:
         await callback.answer(t("generic_error", user.lang), show_alert=True)
         return
 
+    already_reported = await is_already_reported(session, message_id)
     await report_message(
         session, message, reason, auto_disable_threshold=settings.link_auto_disable_report_threshold
     )
-    await track("report_created", user_id=tg_user_id, message_id=message_id, reason=reason)
+    if not already_reported:  # a repeated tap is a no-op, so it isn't counted as a new report
+        await track("report_created", user_id=tg_user_id, message_id=message_id, reason=reason)
 
     await callback.answer(t("report_confirmation", user.lang), show_alert=True)
     await _render_inbox(callback, session, settings)

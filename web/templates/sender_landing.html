@@ -72,7 +72,13 @@
     <p class="success__title">{{ copy.sent_title }}</p>
     <p class="success__note">{{ copy.sent_reassurance }}</p>
   </div>
-  <a class="success__cta" href="https://t.me/{{ bot_username }}">{{ copy.success_secondary_cta }}</a>
+  <p class="success__invite">{{ copy.sent_invite }}</p>
+  <a class="success__cta" id="ctaOwnLink" href="https://t.me/{{ bot_username }}">{{ copy.success_secondary_cta }}</a>
+</div>
+
+<div id="pausedView" class="state-overlay" role="status" hidden>
+  <div class="icon-badge warning" aria-hidden="true">⏸</div>
+  <div class="state-title">{{ copy.paused }}</div>
 </div>
 
 <div id="rateLimitedView" class="state-overlay" role="status" hidden>
@@ -118,6 +124,7 @@
     compose: document.getElementById("composeView"),
     success: document.getElementById("successView"),
     rateLimited: document.getElementById("rateLimitedView"),
+    paused: document.getElementById("pausedView"),
     warning: document.getElementById("warningView"),
     error: document.getElementById("errorView"),
   };
@@ -267,6 +274,8 @@
 
       if (data.status === "success") {
         showView("success");
+      } else if (data.status === "paused") {
+        showView("paused");
       } else if (data.status === "rate_limited") {
         showView("rateLimited");
       } else if (data.status === "needs_warning") {
@@ -281,6 +290,16 @@
   }
 
   sendButton.addEventListener("click", () => submit(false));
+
+  // Anonymous aggregate beacon: "tapped create-your-own-link". No link id, no user id.
+  document.getElementById("ctaOwnLink").addEventListener("click", () => {
+    fetch(`/s/${token}/track`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "sender_cta_clicked" }),
+      keepalive: true,
+    }).catch(() => {});
+  });
 
   document.getElementById("warningEditBtn").addEventListener("click", () => {
     showView("compose");

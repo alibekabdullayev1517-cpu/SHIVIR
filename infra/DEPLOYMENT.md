@@ -229,10 +229,15 @@ second copy of it). Keep that one copy bounded:
 # retention period, e.g.:
 #   /var/log/nginx/*.log {
 #       daily
-#       rotate 30
+#       rotate 14
 #       ...
 #   }
 ```
+
+**Keep the public privacy page true.** `web/routes/legal.py` tells users that raw
+IPs in web-server logs, and deleted-message text in daily backups, are kept for
+"about two weeks". That matches `rotate 14` above and `RETENTION_DAYS=14` in
+`infra/backup.sh`. If you change either number, change the privacy page (uz + ru) too.
 
 And cap how long systemd keeps the bot/web/worker journal:
 
