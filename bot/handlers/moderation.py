@@ -3,17 +3,23 @@ web dashboard — that's V2+ per the master plan's Founder Dashboard section).
 Restricted to the ADMIN_TG_USER_IDS allowlist.
 """
 
+import asyncio
+import logging
+
 from aiogram import F, Router
 from aiogram.filters import Command
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import BufferedInputFile, CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.config import Settings
+from cards.stats_render import render_stats_card
 from core.services.moderation import apply_moderator_decision, moderation_queue
+from core.services.stats import collect_stats, report_uz
 
 from bot.keyboards import moderation_item_keyboard
 
 router = Router(name="moderation")
+logger = logging.getLogger(__name__)
 
 
 def _is_admin(user_id: int, settings: Settings) -> bool:
@@ -42,6 +48,22 @@ async def cmd_modqueue(message: Message, session: AsyncSession, settings: Settin
         # HTML — without this override that untrusted text would be parsed as
         # markup in front of the moderator, e.g. crafted clickable links.
         await message.answer(text, reply_markup=moderation_item_keyboard(item.id), parse_mode=None)
+
+
+@router.message(Command("stats"))
+async def cmd_stats(message: Message, session: AsyncSession, settings: Settings) -> None:
+    """Admin-only aggregate report: Uzbek text, then one PNG. Read-only — records
+    no event, so using it never makes the admin look like an active user."""
+    if not _is_admin(message.from_user.id, settings):
+        return  # silent, exactly like /modqueue
+
+    stats = await collect_stats(session)
+    await message.answer(report_uz(stats), parse_mode=None)
+    try:
+        png = await asyncio.to_thread(render_stats_card, stats)
+        await message.answer_photo(BufferedInputFile(png, filename="shivir-stats.png"))
+    except Exception:
+        logger.exception("Stats card failed")  # the text report has already been delivered
 
 
 @router.callback_query(F.data.startswith("mod:"))
