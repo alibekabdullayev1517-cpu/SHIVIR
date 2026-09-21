@@ -2,6 +2,7 @@
 {% block title %}{{ title }} — Shivir{% endblock %}
 {% block shell_class %} shell--reading{% endblock %}
 {% block content %}
+{% if back_url %}<a class="link backlink enter" style="--i:1" href="{{ back_url }}">{{ back_label }}</a>{% endif %}
 <article class="panel enter" style="--i:1">
   <h1 class="panel__title">{{ title }}</h1>
   <div class="prose">

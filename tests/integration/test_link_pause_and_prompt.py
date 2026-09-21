@@ -86,7 +86,7 @@ async def test_tampered_or_stale_prompt_value_is_never_rendered(client, db_sessi
 
 
 def test_presets_are_short_plain_and_fully_localized():
-    assert set(PRESETS) == set(PRESET_KEYS) and len(PRESET_KEYS) == 6
+    assert set(PRESETS) == set(PRESET_KEYS) and len(PRESET_KEYS) == 7
     for key in PRESET_KEYS:
         for lang in ("uz", "ru"):
             line, label = line_for(key, lang), label_for(key, lang)
@@ -160,18 +160,19 @@ async def test_paused_does_not_change_link_active_or_token(client, db_session, c
 # Success screen invitation + anonymous CTA beacon
 # --------------------------------------------------------------------------
 
-async def test_success_screen_has_optional_invite_and_plain_bot_link(client, db_session, clean_tables):
+async def test_success_screen_asks_what_they_would_want_and_reveals_a_plain_bot_link(client, db_session, clean_tables):
     link = await _owner(db_session, 8020)
     page = (await client.get(f"/s/{link.token}")).text
-    assert t("sent_invite", "uz") in htmllib.unescape(page)
-    cta = re.search(r'<a class="success__cta"[^>]*href="([^"]+)"', page).group(1)
-    assert cta == f"https://t.me/{settings.bot_username}"  # no ?start= payload, no token
+    assert t("sent_ask", "uz") in htmllib.unescape(page)
+    cta = re.search(r'<a class="success__cta success__cta--primary" id="ctaOwnLink"[^>]*href="([^"]+)"', page).group(1)
+    assert cta == f"https://t.me/{settings.bot_username}"  # served link is plain: no payload, never the token
     assert link.token not in cta
+    assert re.search(r'id="ctaWrap" hidden', page)         # CTA stays hidden until a choice is made
 
 
-def test_invite_wording_is_optional_not_pressuring():
+def test_success_wording_is_optional_not_pressuring():
     for lang in ("uz", "ru"):
-        text = t("sent_invite", lang).lower()
+        text = " ".join(t(k, lang) for k in ("sent_ask", "reason_note", "success_cta", "success_cta_hint")).lower()
         for pressure in ("endi navbat", "tez", "shoshil", "bugun", "faqat", "сейчас же", "срочно", "быстрее", "твоя очередь"):
             assert pressure not in text
 
@@ -220,7 +221,7 @@ def test_bot_privacy_summary_is_precise_and_includes_the_integrity_promise():
 
 
 def test_every_new_copy_key_exists_in_both_languages():
-    for key in ("sender_paused", "sent_invite", "link_paused_notice", "settings_paused_line", "settings_prompt_btn",
+    for key in ("sender_paused", "sent_ask", "link_paused_notice", "settings_paused_line", "settings_prompt_btn",
                 "settings_pause_btn", "settings_resume_btn", "pause_on_toast", "pause_off_toast",
                 "prompt_menu_title", "prompt_saved_toast"):
         assert set(COPY[key]) == {"uz", "ru"} and all(COPY[key].values())

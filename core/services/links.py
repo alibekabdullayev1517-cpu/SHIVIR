@@ -1,5 +1,6 @@
 """Personal-link lifecycle: create, look up, regenerate/disable."""
 
+import unicodedata
 from urllib.parse import quote
 
 from sqlalchemy import select
@@ -32,6 +33,33 @@ async def get_or_create_user(session: AsyncSession, tg_user_id: int, lang: str =
             return winner
         raise
     return user
+
+
+# Display names come straight from Telegram and are shown on a public page, so
+# they are cleaned for *rendering* only (the stored value is left as-is).
+# Removed: private-use / unassigned / surrogate / control characters (a name like
+# "Name \uf8ff" carries Apple's logo glyph, which is a box on every other OS) and
+# invisible format characters (bidi overrides, zero-width space). Kept: letters of
+# every script, and the joiners emoji sequences need (ZWJ, variation selectors,
+# keycap combiner).
+_EMOJI_JOINERS = {"\u200d", "\ufe0e", "\ufe0f", "\u20e3"}
+DISPLAY_NAME_MAX = 40
+
+
+def clean_display_name(name: str | None, max_len: int = DISPLAY_NAME_MAX) -> str | None:
+    if not name:
+        return None
+    text = unicodedata.normalize("NFC", name)
+    kept = []
+    for ch in text:
+        cat = unicodedata.category(ch)
+        if ch in _EMOJI_JOINERS or cat in ("Zs", "Zl", "Zp") or not cat.startswith(("C",)):
+            kept.append(" " if cat in ("Zs", "Zl", "Zp") else ch)
+    text = " ".join("".join(kept).split())
+    if len(text) > max_len:
+        text = text[:max_len].rstrip(" \u200d\ufe0e\ufe0f") + "…"
+    return text or None
+
 
 
 async def set_display_name(session: AsyncSession, user: User, display_name: str | None) -> None:

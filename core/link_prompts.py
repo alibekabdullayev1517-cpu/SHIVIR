@@ -15,42 +15,55 @@ DEFAULT_KEY = "none"
 # key -> (line shown to the sender, short button label in the bot), per language.
 PRESETS: dict[str, dict[str, dict[str, str]]] = {
     "ask": {
-        "line": {"uz": "Menga istalgan savol bering 👀", "ru": "Задайте мне любой вопрос 👀"},
+        "line": {"uz": "Menga istalgan savol ber 👀", "ru": "Задай мне любой вопрос 👀"},
         "label": {"uz": "👀 Savol", "ru": "👀 Вопрос"},
     },
     "honest": {
-        "line": {"uz": "Menga halol fikringizni ayting.", "ru": "Скажите мне честно, что думаете."},
+        "line": {"uz": "Menga halol fikringni ayt.", "ru": "Скажи мне честно, что думаешь."},
         "label": {"uz": "💬 Halol fikr", "ru": "💬 Честно"},
     },
     "compliment": {
         "line": {
-            "uz": "Yaxshi gap aytmoqchimisiz? Anonim yozing.",
-            "ru": "Хотите сказать что-то хорошее? Напишите анонимно.",
+            "uz": "Yaxshi gap aytmoqchimisan? Anonim yoz.",
+            "ru": "Хочешь сказать что-то хорошее? Напиши анонимно.",
         },
         "label": {"uz": "💌 Iliq so'z", "ru": "💌 Тёплые слова"},
     },
     "birthday": {
         "line": {
-            "uz": "Tug'ilgan kunim 🎂 — anonim tilaklar yuboring.",
-            "ru": "У меня день рождения 🎂 — оставьте анонимное поздравление.",
+            "uz": "Tug'ilgan kunim 🎂 — anonim tilak yubor.",
+            "ru": "У меня день рождения 🎂 — оставь анонимное поздравление.",
         },
         "label": {"uz": "🎂 Tug'ilgan kun", "ru": "🎂 День рождения"},
     },
     "advice": {
         "line": {
-            "uz": "Maslahat kerak — anonim fikringizni yozing.",
-            "ru": "Нужен совет — напишите анонимно, что думаете.",
+            "uz": "Maslahat kerak — anonim fikringni yoz.",
+            "ru": "Нужен совет — напиши анонимно, что думаешь.",
         },
         "label": {"uz": "🧭 Maslahat", "ru": "🧭 Совет"},
     },
     "memory": {
         "line": {
-            "uz": "Birga o'tgan bir xotirani yozing.",
-            "ru": "Напишите воспоминание о времени, проведённом вместе.",
+            "uz": "Birga o'tgan bir xotirani yoz.",
+            "ru": "Напиши воспоминание о времени, проведённом вместе.",
         },
         "label": {"uz": "📸 Xotira", "ru": "📸 Воспоминание"},
     },
+    "funny": {
+        "line": {
+            "uz": "Meni kuldiradigan bir gap yoz 😄",
+            "ru": "Рассмеши меня — напиши что-нибудь весёлое 😄",
+        },
+        "label": {"uz": "😄 Hazil", "ru": "😄 Шутка"},
+    },
 }
+
+# The four choices offered on the sender's post-send screen. Each is a real
+# preset above: the choice travels in the Telegram deep link (`?start=r_<key>`)
+# and, for a brand-new account only, becomes the line on their first link.
+SENDER_REASON_KEYS: tuple[str, ...] = ("ask", "compliment", "advice", "funny")
+REASON_START_PREFIX = "r_"
 
 PRESET_KEYS: tuple[str, ...] = tuple(PRESETS)
 DEFAULT_LABEL = {"uz": "Standart", "ru": "Стандартная"}

@@ -19,21 +19,26 @@ from core.db import get_session
 from core.models import User
 from core.rate_limit import check_track_rate_limit
 from core.security import compute_fingerprint, generate_csrf_token, verify_csrf_token
-from core.link_prompts import line_for
-from core.services.links import get_link_by_token, get_prompt_key, is_paused
+from core.link_prompts import SENDER_REASON_KEYS, line_for
+from core.services.links import clean_display_name, get_link_by_token, get_prompt_key, is_paused
 from core.services.messages import MAX_MESSAGE_LENGTH, SendStatus, send_message
-from web import assets
+from web import assets, i18n
 from web.prompts import pick_prompts, pool_payload
 
 router = APIRouter()
 logger = logging.getLogger("shivir.web.sender")
 templates = Jinja2Templates(directory="web/templates")
 assets.register(templates)
+i18n.register(templates)
 
 # The redesigned sender page is built for short notes. This is a presentation
 # cap only (textarea maxlength + counter); the server-side limit in
 # core.services.messages is unchanged and remains the authority.
 SENDER_UI_MAX_LENGTH = min(200, MAX_MESSAGE_LENGTH)
+
+
+# Client-triggered analytics allow-list. All but message_started are aggregate-only.
+BEACON_EVENTS = ("message_started", "sender_cta_clicked", "post_send_view", "reason_selected")
 
 
 def get_redis(request: Request) -> Redis:
@@ -61,6 +66,7 @@ def client_fingerprint(request: Request, settings: Settings) -> str:
 async def sender_landing(
     token: str,
     request: Request,
+    lang: str | None = None,
     session: AsyncSession = Depends(get_session),
     settings: Settings = Depends(get_settings),
 ) -> HTMLResponse:
@@ -68,13 +74,14 @@ async def sender_landing(
     await track("link_clicked", link_id=link.id if link else None, token=token if link is None else None)
 
     if link is None or not link.active:
+        page_lang = i18n.resolve_lang(lang)
         return templates.TemplateResponse(
-            request, "invalid.html", {"lang": "uz", "message": t("link_invalid", "uz")}, status_code=404
+            request, "invalid.html", {"lang": page_lang, "message": t("link_invalid", page_lang)}, status_code=404
         )
 
     owner = await session.get(User, link.owner_user_id)
-    lang = owner.lang if owner else "uz"
-    display_name = (owner.settings or {}).get("display_name") if owner else None
+    lang = i18n.resolve_lang(lang, owner.lang if owner else None)   # ?lang= beats the owner's language
+    display_name = clean_display_name((owner.settings or {}).get("display_name") if owner else None)
 
     if is_paused(owner):
         # Owner-controlled pause: neutral wording, no compose form, and no
@@ -100,12 +107,24 @@ async def sender_landing(
             "prompts": pick_prompts(lang),
             "prompt_pool": pool_payload(lang),
             "max_length": SENDER_UI_MAX_LENGTH,
+            "privacy_url": f"/privacy?lang={lang}&back=/s/{token}",
+            "compose_label": (
+                t("compose_label_named", lang).format(name=display_name) if display_name else t("compose_label", lang)
+            ),
+            "reasons": [
+                {"key": key, "label": t(f"reason_{key}", lang)} for key in SENDER_REASON_KEYS
+            ],
+            "start_url": f"https://t.me/{settings.bot_username}",
             "copy": {
                 "hint": hint,
                 "paused": t("sender_paused", lang),
-                "sent_invite": t("sent_invite", lang),
+                "sent_ask": t("sent_ask", lang),
+                "reason_note": t("reason_note", lang),
+                "cta": t("success_cta", lang),
+                "cta_hint": t("success_cta_hint", lang),
+                "offline": t("web_offline", lang),
+                "reasons_label": t("sent_ask", lang),
                 "assurance": t("sender_assurance", lang),
-                "compose_label": t("compose_label", lang),
                 "prompts_label": t("prompts_label", lang),
                 "sending": t("sending_label", lang),
                 "sent": t("sent_label", lang),
@@ -118,9 +137,8 @@ async def sender_landing(
                 "success": t("send_success", lang),
                 "sent_title": t("sent_title", lang),
                 "sent_reassurance": t("sent_reassurance", lang),
-                "success_secondary_cta": t("send_success_secondary_cta", lang),
                 "rate_limited": t("rate_limited", lang),
-                "generic_error": t("generic_error", lang),
+                "generic_error": t("web_error", lang),
                 "abuse_prompt": t("abuse_warning_prompt", lang),
                 "abuse_edit": t("abuse_warning_edit", lang),
                 "abuse_continue": t("abuse_warning_continue", lang),
@@ -211,9 +229,10 @@ async def sender_track_event(
     redis: Redis = Depends(get_redis),
     settings: Settings = Depends(get_settings),
 ) -> JSONResponse:
-    """The client-triggered analytics beacon. Deliberately allow-lists two events:
-    message_started (first keystroke) and sender_cta_clicked (tapped "create your
-    own link" on the success screen). Neither carries anything sender-identifying."""
+    """The client-triggered analytics beacon. Deliberately allow-lists four events:
+    message_started (first keystroke), post_send_view (success screen shown),
+    reason_selected (one of four fixed choices) and sender_cta_clicked (tapped
+    "create your own link"). None carries anything sender-identifying."""
     try:
         body = await request.json()
     except Exception:
@@ -224,7 +243,13 @@ async def sender_track_event(
         return JSONResponse({"status": "ignored"})
 
     name = body.get("name") if isinstance(body, dict) else None
-    if name not in ("message_started", "sender_cta_clicked"):
+    if name not in BEACON_EVENTS:
+        return JSONResponse({"status": "ignored"})
+    # Optional allow-listed reason (one of the four post-send choices). Never free text:
+    # anything else is treated as absent, and `reason_selected` needs a valid one.
+    reason = body.get("reason") if isinstance(body, dict) else None
+    reason = reason if isinstance(reason, str) and reason in SENDER_REASON_KEYS else None
+    if name == "reason_selected" and reason is None:
         return JSONResponse({"status": "ignored"})
 
     # Throttle before touching the database. Checked only for well-formed events, so
@@ -251,7 +276,8 @@ async def sender_track_event(
         if name == "message_started":
             await track("message_started", link_id=link.id)
         else:
-            # Aggregate only: no link id, no user id — this beacon must never
-            # be joinable to a recipient or to a Telegram account.
-            await track("sender_cta_clicked")
+            # Aggregate only: no link id, no user id — these beacons must never
+            # be joinable to a recipient or to a Telegram account. The reason
+            # is one of four fixed keys, nothing the visitor typed.
+            await track(name, **({"reason": reason} if reason else {}))
     return JSONResponse({"status": "ok"})

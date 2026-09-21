@@ -6,11 +6,12 @@ from fastapi import APIRouter, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from web import assets
+from web import assets, i18n
 
 router = APIRouter()
 templates = Jinja2Templates(directory="web/templates")
 assets.register(templates)
+i18n.register(templates)
 
 PARAGRAPHS = {
     "uz": [
@@ -68,6 +69,7 @@ PARAGRAPHS = {
 }
 
 TITLES = {"uz": "Maxfiylik siyosati", "ru": "Политика конфиденциальности"}
+BACK_LABELS = {"uz": "← Orqaga", "ru": "← Назад"}
 
 
 def _structure(paragraphs: list[str]) -> list[dict]:
@@ -86,10 +88,17 @@ def _structure(paragraphs: list[str]) -> list[dict]:
 
 
 @router.get("/privacy", response_class=HTMLResponse)
-async def privacy_policy(request: Request, lang: str = "uz") -> HTMLResponse:
-    lang = lang if lang in PARAGRAPHS else "uz"
+async def privacy_policy(request: Request, lang: str | None = None, back: str | None = None) -> HTMLResponse:
+    lang = i18n.resolve_lang(lang)
+    back_path = i18n.safe_back(back)   # only ever a /s/<token> path — never an arbitrary URL
     return templates.TemplateResponse(
         request,
         "privacy.html",
-        {"lang": lang, "title": TITLES[lang], "blocks": _structure(PARAGRAPHS[lang])},
+        {
+            "lang": lang,
+            "title": TITLES[lang],
+            "blocks": _structure(PARAGRAPHS[lang]),
+            "back_url": f"{back_path}?lang={lang}" if back_path else None,
+            "back_label": BACK_LABELS[lang],
+        },
     )

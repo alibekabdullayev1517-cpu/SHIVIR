@@ -15,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from core.analytics import track
 from core.config import Settings
 from core.copy import t
+from core.link_prompts import REASON_START_PREFIX, SENDER_REASON_KEYS
 from core.models import User
 from core.services.links import (
     build_sender_url,
@@ -24,6 +25,7 @@ from core.services.links import (
     has_any_link,
     is_paused,
     set_display_name,
+    set_prompt_key,
 )
 
 from bot.keyboards import language_keyboard, link_ready_keyboard, main_reply_keyboard, welcome_keyboard
@@ -31,6 +33,15 @@ from bot.keyboards import language_keyboard, link_ready_keyboard, main_reply_key
 _LINK_LABELS = {"🔗 Havolam", "🔗 Моя ссылка"}
 
 router = Router(name="start")
+
+
+def _reason_from_payload(payload: str | None) -> str | None:
+    """`r_<key>` where <key> is one of the four fixed post-send choices; anything else is ignored."""
+    if payload and payload.startswith(REASON_START_PREFIX):
+        key = payload[len(REASON_START_PREFIX):]
+        if key in SENDER_REASON_KEYS:
+            return key
+    return None
 
 
 @router.message(CommandStart())
@@ -61,11 +72,18 @@ async def cmd_start(message: Message, session: AsyncSession, settings: Settings)
     default_lang = "ru" if detected.startswith("ru") else "uz"
     user = await get_or_create_user(session, tg_user_id, lang=default_lang)
     await set_display_name(session, user, message.from_user.first_name)
+    reason = _reason_from_payload(payload)
+    if reason:
+        # The sender's post-send choice ("what would you want to receive?"): applied to
+        # this brand-new account only, as the line on its first link. Existing accounts
+        # never reach here, so an old link's settings are never overwritten.
+        await set_prompt_key(session, user, reason)
     await track(
         "bot_started",
         user_id=tg_user_id,
         source="deep_link" if payload else "organic",
         is_returning=is_returning,
+        **({"reason": reason} if reason else {}),
     )
     await message.answer(
         "Tilni tanlang / Выберите язык", reply_markup=language_keyboard()

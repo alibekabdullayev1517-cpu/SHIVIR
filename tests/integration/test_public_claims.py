@@ -86,7 +86,7 @@ _OVERSTATEMENTS = (
 
 def _public_texts() -> list[str]:
     keys = ("privacy_summary", "safety_summary", "sender_hint", "sender_assurance", "sent_reassurance",
-            "send_success", "sent_title", "sender_paused", "sent_invite", "link_ready_title",
+            "send_success", "sent_title", "sender_paused", "sent_ask", "reason_note", "success_cta", "success_cta_hint", "link_ready_title",
             "welcome_body", "report_confirmation", "block_confirmation")
     texts = [COPY[k][lang] for k in keys for lang in ("uz", "ru")]
     texts += PARAGRAPHS["uz"] + PARAGRAPHS["ru"]

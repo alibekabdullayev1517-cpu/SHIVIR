@@ -13,7 +13,7 @@
   </section>
 
   <div class="composer enter" style="--i:2">
-    <label class="sr-only" for="composer">{{ copy.compose_label }}</label>
+    <label class="sr-only" for="composer">{{ compose_label }}</label>
     <textarea id="composer" maxlength="{{ max_length }}" rows="4" spellcheck="false"
               placeholder="{{ copy.placeholder }}" aria-describedby="composerLimit"></textarea>
     <span class="sr-only" id="composerLimit">{{ copy.chars_max_hint }}</span>
@@ -56,7 +56,7 @@
       </svg>
       {{ copy.assurance }}
     </span>
-    <a class="link" href="/privacy?lang={{ lang }}">{{ copy.privacy_link }}</a>
+    <a class="link" href="{{ privacy_url }}">{{ copy.privacy_link }}</a>
   </p>
 
   <p class="sr-only" id="srStatus" aria-live="polite"></p>
@@ -72,8 +72,20 @@
     <p class="success__title">{{ copy.sent_title }}</p>
     <p class="success__note">{{ copy.sent_reassurance }}</p>
   </div>
-  <p class="success__invite">{{ copy.sent_invite }}</p>
-  <a class="success__cta" id="ctaOwnLink" href="https://t.me/{{ bot_username }}">{{ copy.success_secondary_cta }}</a>
+  <p class="success__ask" id="reasonsLabel">{{ copy.sent_ask }}</p>
+  <div class="reasons" id="reasons" role="group" aria-labelledby="reasonsLabel">
+    {% for reason in reasons %}
+    <button type="button" class="reason" data-reason="{{ reason.key }}" aria-pressed="false">
+      <span>{{ reason.label }}</span>
+      <svg class="reason__check" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3.5 8.5l3 3 6-6.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    {% endfor %}
+  </div>
+  <p class="success__reason-note" id="reasonNote" aria-live="polite"></p>
+  <div class="success__cta-wrap" id="ctaWrap" hidden>
+    <a class="success__cta success__cta--primary" id="ctaOwnLink" href="{{ start_url }}" rel="noopener">{{ copy.cta }}</a>
+    <span class="success__cta-hint">{{ copy.cta_hint }}</span>
+  </div>
 </div>
 
 <div id="pausedView" class="state-overlay" role="status" hidden>
@@ -97,7 +109,7 @@
 
 <div id="errorView" class="state-overlay" role="alert" hidden>
   <div class="icon-badge error" aria-hidden="true">!</div>
-  <div class="state-title">{{ copy.generic_error }}</div>
+  <div class="state-title" id="errorTitle">{{ copy.generic_error }}</div>
   <button type="button" class="secondary" id="errorRetryBtn">{{ copy.send_cta }}</button>
 </div>
 
@@ -110,7 +122,9 @@
   const i18n = {
     charsLeft: {{ copy.chars_left | tojson }},
     limitReached: {{ copy.chars_limit_reached | tojson }},
+    reasonNote: {{ copy.reason_note | tojson }},
   };
+  const startUrl = {{ start_url | tojson }};
 
   const composer = document.getElementById("composer");
   const counterRow = document.getElementById("counterRow");
@@ -129,10 +143,13 @@
     error: document.getElementById("errorView"),
   };
 
-  function showView(name) {
+  const errorTitle = document.getElementById("errorTitle");
+  const errorDefault = errorTitle.textContent;
+  function showView(name, message) {
     for (const key in views) {
       views[key].hidden = key !== name;
     }
+    if (name === "error") errorTitle.textContent = message || errorDefault;   // network failure vs server error
   }
 
   /* ---- Suggested prompts: always exactly 3, never the same 3 as last visit.
@@ -174,17 +191,20 @@
   }
   rotatePrompts();
 
-  /* ---- Analytics beacon (unchanged) -------------------------------------- */
+  /* ---- Analytics beacon: anonymous, allow-listed on the server ------------ */
+  function beacon(name, extra) {
+    fetch(`/s/${token}/track`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(Object.assign({ name: name }, extra || {})),
+      keepalive: true,
+    }).catch(() => {});
+  }
   let startedTracked = false;
   function trackMessageStarted() {
     if (startedTracked) return;
     startedTracked = true;
-    fetch(`/s/${token}/track`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: "message_started" }),
-      keepalive: true,
-    }).catch(() => {});
+    beacon("message_started");
   }
 
   /* ---- Counter ------------------------------------------------------------ */
@@ -274,6 +294,7 @@
 
       if (data.status === "success") {
         showView("success");
+        beacon("post_send_view");
       } else if (data.status === "paused") {
         showView("paused");
       } else if (data.status === "rate_limited") {
@@ -285,20 +306,37 @@
       }
     } catch (err) {
       setSending(false);
-      showView("error");
+      showView("error", {{ copy.offline | tojson }});
     }
   }
 
   sendButton.addEventListener("click", () => submit(false));
 
-  // Anonymous aggregate beacon: "tapped create-your-own-link". No link id, no user id.
-  document.getElementById("ctaOwnLink").addEventListener("click", () => {
-    fetch(`/s/${token}/track`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: "sender_cta_clicked" }),
-      keepalive: true,
-    }).catch(() => {});
+  /* ---- Post-send: choose what you'd want to receive, then open your own SHIVIR.
+     The choice is real: it goes into the Telegram deep link (?start=r_<key>) and
+     becomes the line on the new account's first link. Nothing is stored here. ---- */
+  const reasonButtons = Array.from(document.querySelectorAll("#reasons .reason"));
+  const reasonsBox = document.getElementById("reasons");
+  const reasonNote = document.getElementById("reasonNote");
+  const ctaWrap = document.getElementById("ctaWrap");
+  const ctaLink = document.getElementById("ctaOwnLink");
+  let chosenReason = null;
+
+  reasonButtons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      chosenReason = btn.dataset.reason;
+      reasonButtons.forEach((b) => b.setAttribute("aria-pressed", String(b === btn)));
+      reasonsBox.dataset.chosen = chosenReason;
+      reasonNote.textContent = i18n.reasonNote;
+      ctaLink.href = startUrl + "?start=r_" + encodeURIComponent(chosenReason);
+      ctaWrap.hidden = false;
+      beacon("reason_selected", { reason: chosenReason });
+    });
+  });
+
+  // "Tapped open-my-own": aggregate only — no link id, no user id; the reason is one of four fixed keys.
+  ctaLink.addEventListener("click", () => {
+    beacon("sender_cta_clicked", chosenReason ? { reason: chosenReason } : {});
   });
 
   document.getElementById("warningEditBtn").addEventListener("click", () => {

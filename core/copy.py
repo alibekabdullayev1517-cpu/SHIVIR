@@ -57,20 +57,16 @@ COPY: dict[str, dict[str, str]] = {
         "ru": "Отправьте анонимное сообщение этому человеку. Они не узнают, кто вы.",
     },
     "sender_hint": {
-        "uz": "Bu odamga anonim xabar yuboring.",
-        "ru": "Отправьте анонимное сообщение этому человеку.",
+        "uz": "Nima deging kelyapti?",
+        "ru": "Что хочется сказать?",
     },
     "sender_assurance": {
-        "uz": "Ular kim yozganini bilishmaydi.",
-        "ru": "Они не узнают, кто вы.",
+        "uz": "Oluvchi kim yozganini bilmaydi.",
+        "ru": "Получатель не узнает, кто ты.",
     },
     "sender_paused": {
         "uz": "Bu havola hozircha xabar qabul qilmayapti.",
         "ru": "Эта ссылка сейчас не принимает сообщения.",
-    },
-    "sent_invite": {
-        "uz": "Xohlasang, sen ham o'z havolangni yaratib, do'stlaringdan anonim xabar ola olasan.",
-        "ru": "Если хочешь, создай свою ссылку и получай анонимные сообщения от друзей.",
     },
     "link_paused_notice": {
         "uz": "⏸ Havolangiz to'xtatilgan — yangi xabarlar kelmaydi. Sozlamalardan yoqishingiz mumkin.",
@@ -90,39 +86,39 @@ COPY: dict[str, dict[str, str]] = {
         "ru": "Выберите короткую строку, которую увидят на странице вашей ссылки:",
     },
     "prompt_saved_toast": {"uz": "Saqlandi.", "ru": "Сохранено."},
-    "compose_label": {"uz": "Anonim xabaringiz", "ru": "Ваше анонимное сообщение"},
-    "prompts_label": {
-        "uz": "Xabarni boshlash uchun takliflar",
-        "ru": "Подсказки, с чего начать",
+    "compose_label": {
+        "uz": "Anonim xabar",
+        "ru": "Анонимное сообщение",
     },
     "sending_label": {"uz": "Yuborilmoqda…", "ru": "Отправка…"},
     "sent_label": {"uz": "Yuborildi", "ru": "Отправлено"},
     "chars_max_hint": {"uz": "Ko‘pi bilan {n} ta belgi.", "ru": "Не более {n} символов."},
     "chars_left": {"uz": "{n} ta belgi qoldi.", "ru": "Осталось символов: {n}."},
     "chars_limit_reached": {
-        "uz": "Belgilar chegarasiga yetdingiz.",
+        "uz": "Belgilar chegarasiga yetding.",
         "ru": "Достигнут предел символов.",
     },
-    "privacy_link": {"uz": "Maxfiylik siyosati", "ru": "Политика конфиденциальности"},
-    "compose_placeholder": {"uz": "Xabaringizni yozing...", "ru": "Напишите сообщение..."},
-    "send_cta": {"uz": "Yuborish", "ru": "Отправить"},
-    "send_success": {
-        "uz": "Xabaringiz yuborildi ✅ Oluvchi kim yozganini bilmaydi.",
-        "ru": "Сообщение отправлено ✅ Получатель не узнает, кто вы.",
+    "prompts_label": {
+        "uz": "Xabarni boshlash uchun takliflar",
+        "ru": "Подсказки, с чего начать",
     },
-    "sent_title": {"uz": "Xabaringiz yuborildi", "ru": "Сообщение отправлено"},
-    "sent_reassurance": {"uz": "Oluvchi kim yozganini bilmaydi.", "ru": "Получатель не узнает, кто вы."},
-    "send_success_secondary_cta": {
-        "uz": "O'zingizning Shivir havolangizni yarating",
-        "ru": "Создайте свою ссылку Shivir",
+    "send_cta": {"uz": "Yuborish", "ru": "Отправить"},
+    "privacy_link": {"uz": "Maxfiylik siyosati", "ru": "Политика конфиденциальности"},
+    "compose_placeholder": {
+        "uz": "Xabaringni yoz...",
+        "ru": "Напиши сообщение...",
+    },
+    "sent_title": {
+        "uz": "Xabaring yuborildi",
+        "ru": "Сообщение отправлено",
     },
     "rate_limited": {
-        "uz": "Juda tez-tez xabar yubordingiz. Bir necha daqiqadan so'ng qayta urinib ko'ring.",
-        "ru": "Вы отправляете сообщения слишком часто. Попробуйте через несколько минут.",
+        "uz": "Juda tez-tez xabar yubording. Bir necha daqiqadan so'ng qayta urinib ko'r.",
+        "ru": "Ты отправляешь сообщения слишком часто. Попробуй через несколько минут.",
     },
     "link_invalid": {"uz": "Bu havola faol emas.", "ru": "Эта ссылка не активна."},
     "abuse_warning_prompt": {
-        "uz": "Bu xabar qoidalarga zid bo'lishi mumkin. Davom etasizmi?",
+        "uz": "Bu xabar qoidalarga zid bo'lishi mumkin. Davom etamizmi?",
         "ru": "Это сообщение может нарушать правила. Продолжить?",
     },
     "abuse_warning_edit": {"uz": "Tahrirlash", "ru": "Изменить"},
@@ -142,6 +138,66 @@ COPY: dict[str, dict[str, str]] = {
     },
     "main_menu_ready": {"uz": "Asosiy menyu tayyor 👇", "ru": "Главное меню готово 👇"},
     "back_button": {"uz": "◀️ Orqaga", "ru": "◀️ Назад"},
+    "compose_label_named": {
+        "uz": "{name} uchun anonim xabar",
+        "ru": "Анонимное сообщение для {name}",
+    },
+    "send_success": {
+        "uz": "Xabaring yuborildi ✅ Oluvchi kim yozganini bilmaydi.",
+        "ru": "Сообщение отправлено ✅ Получатель не узнает, кто ты.",
+    },
+    "sent_reassurance": {
+        "uz": "Oluvchi kim yozganini bilmaydi.",
+        "ru": "Получатель не узнает, кто ты.",
+    },
+    "web_error": {
+        "uz": "Nimadir xato ketdi. Qayta urinib ko'r.",
+        "ru": "Что-то пошло не так. Попробуй ещё раз.",
+    },
+    "web_offline": {
+        "uz": "Internetga ulanib bo'lmadi. Qayta urinib ko'r.",
+        "ru": "Нет соединения. Попробуй ещё раз.",
+    },
+    "web_back": {
+        "uz": "← Orqaga",
+        "ru": "← Назад",
+    },
+    "lang_switch_label": {
+        "uz": "Til",
+        "ru": "Язык",
+    },
+    "sent_ask": {
+        "uz": "Endi senga nima yozishsin? 👀",
+        "ru": "А что написали бы тебе? 👀",
+    },
+    "reason_ask": {
+        "uz": "💬 Savol",
+        "ru": "💬 Вопрос",
+    },
+    "reason_compliment": {
+        "uz": "💛 Iliq gap",
+        "ru": "💛 Тёплые слова",
+    },
+    "reason_advice": {
+        "uz": "💡 Maslahat",
+        "ru": "💡 Совет",
+    },
+    "reason_funny": {
+        "uz": "😄 Hazil",
+        "ru": "😄 Шутка",
+    },
+    "reason_note": {
+        "uz": "Yangi havolangda shu mavzu tanlangan bo'ladi.",
+        "ru": "В твоей новой ссылке будет выбрана эта тема.",
+    },
+    "success_cta": {
+        "uz": "Men ham SHIVIR ochaman",
+        "ru": "Хочу свой SHIVIR",
+    },
+    "success_cta_hint": {
+        "uz": "Telegram'da ochiladi",
+        "ru": "Откроется в Telegram",
+    },
 }
 
 

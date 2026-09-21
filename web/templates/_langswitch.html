@@ -1,0 +1,7 @@
+{# UZ | RU switch: same page, other language (?lang=). Plain links — works without JS. #}
+{% set links = lang_links(request) %}
+<nav class="langswitch enter" style="--i:0" aria-label="{{ t('lang_switch_label', lang) }}">
+  {% for code in ("uz", "ru") %}
+  <a href="{{ links[code] }}" hreflang="{{ code }}" lang="{{ code }}"{% if code == lang %} aria-current="true"{% endif %}>{{ code | upper }}</a>
+  {% endfor %}
+</nav>
