@@ -1,8 +1,6 @@
 """Regression tests for the 3 bot UX fixes: persistent main-action
-ReplyKeyboardMarkup, "back" navigation in submenus, and a working native
-Telegram share flow for "Ulashish"."""
-
-from urllib.parse import parse_qs, urlparse
+ReplyKeyboardMarkup, "back" navigation in submenus, and the link screen's
+native copy button ("📋 Nusxalash")."""
 
 from aiogram.types import ReplyKeyboardMarkup
 
@@ -119,10 +117,10 @@ async def test_home_open_returns_to_home_without_duplicating_inline_keyboard(db_
     assert fake_msg.edited[-1]["reply_markup"] is None
 
 
-# --- 3. Real Telegram share flow ----------------------------------------------
+# --- 3. Link screen: copy button ----------------------------------------------
 
 
-async def test_ulashish_button_is_real_telegram_share_url_with_actual_link(db_session, clean_tables):
+async def test_link_screen_has_single_copy_button_with_the_exact_link(db_session, clean_tables):
     db_session.add(User(tg_user_id=3006, lang="uz"))
     await db_session.commit()
 
@@ -130,39 +128,33 @@ async def test_ulashish_button_is_real_telegram_share_url_with_actual_link(db_se
     create_cb = FakeCallbackQuery(user_id=3006, data="link:create", message=fake_msg)
     await start.on_create_link(create_cb, db_session, settings)
 
-    markup = fake_msg.edited[-1]["reply_markup"]
-    share_btn = _inline_button(markup, url_prefix="https://t.me/share/url?")
-    assert share_btn is not None
-
-    parsed = urlparse(share_btn.url)
-    assert parsed.netloc == "t.me"
-    assert parsed.path == "/share/url"
-    query = parse_qs(parsed.query)
-
     from sqlalchemy import select
 
     result = await db_session.execute(select(PublicLink).where(PublicLink.owner_user_id == 3006))
     link = result.scalars().first()
     real_url = build_sender_url(settings.web_base_url, link.token)
 
-    assert query["url"] == [real_url]
-    assert "share_message" not in query  # sanity: only url/text params exist
-    assert query["text"]  # a real, non-empty share message is present
+    markup = fake_msg.edited[-1]["reply_markup"]
+    buttons = [btn for row in markup.inline_keyboard for btn in row]
+    assert [btn.text for btn in buttons] == ["📋 Nusxalash"]  # "Ulashish" is gone
+    assert buttons[0].copy_text.text == real_url              # exact link, copied natively by Telegram
+    assert buttons[0].url is None and buttons[0].callback_data is None  # no share URL, no callback
 
 
-def test_link_ready_keyboard_never_fabricates_a_different_domain():
+def test_link_ready_keyboard_copies_the_exact_link_and_never_shares():
+    link = "https://shivir.online/s/realtoken123"
+    for lang, label in (("uz", "📋 Nusxalash"), ("ru", "📋 Копировать")):
+        (btn,) = [b for row in link_ready_keyboard(lang, link).inline_keyboard for b in row]
+        assert btn.text == label and btn.copy_text.text == link
+        assert "Ulashish" not in btn.text and "Поделиться" not in btn.text
+        assert btn.url is None
+
+
+def test_link_ready_keyboard_has_no_copy_callback():
+    """The copy button is a client-side copy_text button: no `link:copy` callback,
+    so no new bot round-trip or analytics event exists."""
     markup = link_ready_keyboard("uz", "https://shivir.online/s/realtoken123")
-    share_btn = _inline_button(markup, url_prefix="https://t.me/share/url?")
-    parsed_query = parse_qs(urlparse(share_btn.url).query)
-    assert parsed_query["url"] == ["https://shivir.online/s/realtoken123"]
-
-
-def test_link_ready_keyboard_has_no_copy_button():
-    """"📋 Linkni nusxalash" is removed entirely — only real native Ulashish
-    share remains."""
-    markup = link_ready_keyboard("uz", "https://shivir.online/s/realtoken123")
-    copy_btn = _inline_button(markup, callback_data="link:copy")
-    assert copy_btn is None
+    assert _inline_button(markup, callback_data="link:copy") is None
 
 
 def test_link_ready_keyboard_has_no_qutim_or_sozlamalar_shortcuts():

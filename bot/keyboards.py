@@ -1,7 +1,7 @@
 """Inline keyboard builders for every bot screen, plus the one persistent
 ReplyKeyboardMarkup (main_reply_keyboard)."""
 
-from aiogram.types import InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
+from aiogram.types import CopyTextButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from core.copy import t
@@ -34,11 +34,10 @@ def welcome_keyboard(lang: str) -> InlineKeyboardMarkup:
 
 def link_ready_keyboard(lang: str, link_url: str) -> InlineKeyboardMarkup:
     b = InlineKeyboardBuilder()
-    # A `url=` button is the only way to trigger Telegram's own native
-    # share/forward picker client-side — it never fires a callback (a hard
-    # Bot API limitation), so link_shared analytics cannot be tracked from
-    # this button.
-    b.button(text=t("share_cta", lang), url=build_telegram_share_url(link_url, t("share_message", lang)))
+    # A `copy_text` button is handled entirely by the Telegram client: it puts
+    # `link_url` on the clipboard and shows Telegram's own "copied" notice. It
+    # never fires a callback, so nothing is tracked or sent to the bot.
+    b.button(text=f"📋 {t('copy_cta', lang)}", copy_text=CopyTextButton(text=link_url))
     b.adjust(1)
     return b.as_markup()
 
